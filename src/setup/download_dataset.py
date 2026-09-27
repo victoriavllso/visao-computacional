@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).parent.parent))
+
 from utils.constants import DATASET_DIR, HF_REPO_ID, HF_REPO_TYPE
 from utils.logger import Logger
 
