@@ -63,7 +63,11 @@ def _process_row_group(
     return writer, rows_added
 
 
-def filter_brazil(dataset_dir: Path) -> None:
+def filter_brazil(dataset_dir: Path):
+    if FILTER_BRAZIL_OUTPUT_FILE.exists():
+        log.info("Brazil filter already completed. Skipping.")
+        log.blank()
+        return
     input_file = dataset_dir / HF_FOOD_FILE
 
     if not input_file.exists():

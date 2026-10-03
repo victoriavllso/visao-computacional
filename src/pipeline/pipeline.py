@@ -7,6 +7,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.constants import DATASET_DIR
 from utils.logger import Logger
 from preprocess.filter_brazil import filter_brazil
+from preprocess.filter_front import filter_front
+from preprocess.download_front_images import download_front_images
 
 log = Logger("pipeline")
 
@@ -29,9 +31,18 @@ def main() -> None:
     print(" Open Food Facts — Pipeline")
     print("=" * 60)
 
-    log.info("Stage 1 — Preprocessing")
+    log.info("Stage 1 — Filter Brazil")
     log.blank()
     filter_brazil(args.dataset_dir)
+
+    log.info("Stage 2 — Filter front_pt")
+    log.blank()
+    filter_front()
+
+    log.info("Stage 3 — Download fron images")
+    log.blank()
+    download_front_images()
+
 
     log.blank()
     log.info("Pipeline complete.")

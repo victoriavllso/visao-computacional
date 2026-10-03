@@ -14,3 +14,6 @@ HF_BEAUTY_FILE: str = "beauty.parquet"
 
 FILTER_BRAZIL_OUTPUT_DIR: Path = DATA_DIR / "brazil"
 FILTER_BRAZIL_OUTPUT_FILE: Path = FILTER_BRAZIL_OUTPUT_DIR / "food_brazil.parquet"
+FILTER_FRONT_OUTPUT_DIR: Path = DATA_DIR / "brazil_with_front_pt"
+FILTER_FRONT_OUTPUT_FILE: Path = FILTER_FRONT_OUTPUT_DIR / "products_with_front_pt.parquet"
+IMAGES_FRONT_OUTPUT_DIR:Path = FILTER_FRONT_OUTPUT_DIR / "images"
