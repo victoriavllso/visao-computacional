@@ -65,7 +65,7 @@ def _process_row_group(
 
 def filter_brazil(dataset_dir: Path):
     if FILTER_BRAZIL_OUTPUT_FILE.exists():
-        log.info("Brazil filter already completed. Skipping.")
+        log.skip("Brazil filter already completed")
         log.blank()
         return
     input_file = dataset_dir / HF_FOOD_FILE

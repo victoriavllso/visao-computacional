@@ -1,14 +1,15 @@
 import sys
 from pathlib import Path
 import argparse
-
 sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent))
 
+from ingestion.download_images import download_front_images
 from utils.constants import DATASET_DIR
 from utils.logger import Logger
-from preprocess.filter_brazil import filter_brazil
-from preprocess.filter_front import filter_front
-from preprocess.download_front_images import download_front_images
+from preprocessing.filter_brazil import filter_brazil
+from preprocessing.filter_images import filter_front
+import time
 
 log = Logger("pipeline")
 
@@ -41,8 +42,10 @@ def main() -> None:
 
     log.info("Stage 3 — Download fron images")
     log.blank()
+    inicio = time.perf_counter()
     download_front_images()
-
+    fim= time.perf_counter()
+    print(f'tempo de execução: {fim-inicio}')
 
     log.blank()
     log.info("Pipeline complete.")
