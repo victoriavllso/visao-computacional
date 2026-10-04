@@ -1,12 +1,15 @@
 import sys
 from pathlib import Path
 import argparse
-
 sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent))
 
+from ingestion.download_images import download_front_images
 from utils.constants import DATASET_DIR
 from utils.logger import Logger
-from preprocess.filter_brazil import filter_brazil
+from preprocessing.filter_brazil import filter_brazil
+from preprocessing.filter_images import filter_front
+import time
 
 log = Logger("pipeline")
 
@@ -29,9 +32,20 @@ def main() -> None:
     print(" Open Food Facts — Pipeline")
     print("=" * 60)
 
-    log.info("Stage 1 — Preprocessing")
+    log.info("Stage 1 — Filter Brazil")
     log.blank()
     filter_brazil(args.dataset_dir)
+
+    log.info("Stage 2 — Filter front_pt")
+    log.blank()
+    filter_front()
+
+    log.info("Stage 3 — Download fron images")
+    log.blank()
+    inicio = time.perf_counter()
+    download_front_images()
+    fim= time.perf_counter()
+    print(f'tempo de execução: {fim-inicio}')
 
     log.blank()
     log.info("Pipeline complete.")

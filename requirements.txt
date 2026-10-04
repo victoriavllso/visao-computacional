@@ -14,3 +14,5 @@ pyarrow==25.0.1
 PyYAML==6.0.3
 tqdm==4.70.1
 typing_extensions==4.16.0
+pandas==3.0.6
+requests==2.34.2

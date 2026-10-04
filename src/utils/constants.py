@@ -14,3 +14,18 @@ HF_BEAUTY_FILE: str = "beauty.parquet"
 
 FILTER_BRAZIL_OUTPUT_DIR: Path = DATA_DIR / "brazil"
 FILTER_BRAZIL_OUTPUT_FILE: Path = FILTER_BRAZIL_OUTPUT_DIR / "food_brazil.parquet"
+FILTER_FRONT_OUTPUT_DIR: Path = DATA_DIR / "brazil_with_front_pt"
+FILTER_FRONT_OUTPUT_FILE: Path = FILTER_FRONT_OUTPUT_DIR / "products_with_front_pt.parquet"
+IMAGES_FRONT_OUTPUT_DIR:Path = FILTER_FRONT_OUTPUT_DIR / "images"
+
+
+AWS_BASE_URL = "https://openfoodfacts-images.s3.eu-west-3.amazonaws.com/data"
+OFF_BASE_URL = "https://images.openfoodfacts.org/images/products"
+USER_AGENT = (
+    "visao-computacional/1.0 "
+    "(Open Food Facts image dataset)"
+)
+IMAGE_SIZE = "400"
+MAX_CONCURRENT_DOWNLOADS = 20
+MAX_RETRIES = 3
+REQUEST_TIMEOUT = 30
