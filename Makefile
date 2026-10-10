@@ -1,4 +1,4 @@
-.PHONY: setup setup-dev download pipeline test
+.PHONY: setup setup-dev download pipeline test label
 
 setup:
 	python3 src/setup/setup_env.py
@@ -14,3 +14,6 @@ pipeline:
 
 test:
 	python3 -m pytest tests
+
+label:
+	python3 src/labeling/server.py $(if $(LABELER),--labeler $(LABELER))

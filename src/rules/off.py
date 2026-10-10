@@ -1,5 +1,6 @@
-"""Apply the ANVISA rules to Open Food Facts data: the reference answer for
-which warnings each product should have."""
+"""Apply the ANVISA rules to the ground truth (hand labels where they exist,
+Open Food Facts data otherwise): the reference answer for which warnings
+each product should have."""
 
 import re
 
@@ -48,22 +49,26 @@ def facts_from_off(product) -> NutritionFacts:
 
 
 def expected_warnings_from_off():
-    if OFF_EXPECTED_WARNINGS_FILE.exists():
-        log.skip("OFF expected warnings already computed")
-        log.blank()
-        return
+    # Always recomputed: hand labels change as people add them.
+    # Imported here: labeling.labels builds on this module.
+    from labeling.labels import load_labels, truth_facts
 
     df = pd.read_parquet(FILTER_PAIRS_OUTPUT_FILE)
+    labels = load_labels()
     rows = []
 
     for product in df.itertuples(index=False):
-        facts = facts_from_off(product)
+        facts, source = truth_facts(product, labels)
+        if facts is None:
+            # Hand-checked: no readable table, nothing to apply the rules to.
+            facts = NutritionFacts(None, None, None, None)
         exemption = exemption_from_categories(product.categories_tags)
         assessment = assess(facts, exemption)
 
         row = {
             "code": product.code,
             "split": product.split,
+            "truth": source,
             "basis": None if facts.basis is None else facts.basis.value,
             "exemption": exemption.value,
             "needs_warning": assessment.needs_warning,

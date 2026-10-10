@@ -188,3 +188,67 @@ def test_misread_headers(header, basis):
     words = [Word(t, 300 + 60 * i, 0, 50, 20) for i, t in enumerate(header)]
 
     assert parse_table(words).facts.basis is basis
+
+
+def test_value_aligned_with_100g_header_beats_nearer_portion_value():
+    # The 100 g value was not read; the nearest number is the portion value.
+    words = [
+        *row(0, (300, "100"), (340, "g"), (420, "60"), (450, "g")),
+        *row(40, (0, "Sódio"), (60, "(mg)"), (300, "579"), (420, "347")),
+        *row(80, (0, "Açúcares"), (90, "adicionados"), (420, "0")),
+    ]
+    facts = parse_table(words).facts
+
+    assert facts.sodium_mg == 579
+    # No number under '100 g' on this row: falls back to the row value.
+    assert facts.added_sugars_g == 0
+
+
+@pytest.mark.parametrize(
+    "label", [["Aç", "adicionados"], ["Aç.", "adic."], ["Açúcares", "adicionados"]]
+)
+def test_abbreviated_added_sugars(label):
+    words = row(
+        0, *[(90 * i, t) for i, t in enumerate(label)], (300, "(g)"), (360, "23")
+    )
+
+    assert parse_table(words).facts.added_sugars_g == 23
+
+
+def test_linear_format():
+    # Small packages: values as running text instead of a table.
+    words = (
+        row(
+            0,
+            (0, "Por"),
+            (40, "100"),
+            (80, "g"),
+            (100, "(40"),
+            (140, "g,"),
+            (180, "%VD*):"),
+        )
+        + row(
+            40,
+            (0, "Açúcares"),
+            (90, "adicionados"),
+            (200, "23"),
+            (230, "g"),
+            (260, "(9,4"),
+            (310, "g,"),
+            (340, "18%)"),
+            (400, "Gorduras"),
+            (490, "saturadas"),
+            (590, "4,7"),
+            (620, "g"),
+            (650, "(1,9"),
+        )
+        + row(80, (0, "Sódio"), (60, "113"), (100, "mg"), (140, "(45"), (180, "mg,"))
+    )
+    facts = parse_table(words).facts
+
+    assert facts.basis is Basis.SOLID
+    assert (facts.added_sugars_g, facts.saturated_fat_g, facts.sodium_mg) == (
+        23,
+        4.7,
+        113,
+    )

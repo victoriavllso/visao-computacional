@@ -130,6 +130,62 @@ def rotate(image, angle):
     )
 
 
+# Straighten curved/creased tables along their ruled lines.
+DEWARP = True
+# A horizontal line must span this fraction of the table to guide dewarping.
+DEWARP_LINE_SPAN = 0.4
+DEWARP_DEGREE = 3
+
+
+def dewarp(image):
+    """Remap the table so its horizontal ruled lines become straight.
+
+    Text-line dewarping (Ulges et al. 2004; Pugliese et al.) applied to the
+    ruled lines, which are easier to detect than text lines: fit a cubic
+    y = f(x) to each line, then shift every column vertically so each line
+    lands on its mean height, interpolating the shift between lines.
+    """
+    scale = min(1.0, WORK_SIZE / max(image.shape[:2]))
+    small = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY) if small.ndim == 3 else small
+    bw = binarize(gray)
+    h_lines, _ = line_masks(bw, estimate_text_height(bw))
+    height, width = h_lines.shape
+
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(h_lines)
+    fits = []
+    for i in range(1, n):
+        if stats[i, cv2.CC_STAT_WIDTH] < DEWARP_LINE_SPAN * width:
+            continue
+        ys, xs = np.nonzero(labels == i)
+        poly = np.polynomial.Polynomial.fit(xs, ys, DEWARP_DEGREE)
+        columns = np.clip(np.arange(width), xs.min(), xs.max())  # no extrapolation
+        curve = poly(columns)
+        fits.append((float(np.median(ys)), curve - np.median(ys)))
+
+    if len(fits) < 3:
+        return image
+
+    fits.sort(key=lambda f: f[0])
+    targets = np.array([t for t, _ in fits])
+    shifts = np.stack([d for _, d in fits])  # lines × columns
+    if np.abs(shifts).max() > 0.15 * height:
+        return image  # implausible fit
+
+    rows = np.arange(height, dtype=np.float32)
+    map_y = np.empty((height, width), np.float32)
+    for x in range(width):
+        map_y[:, x] = rows + np.interp(rows, targets, shifts[:, x])
+    map_x = np.tile(np.arange(width, dtype=np.float32), (height, 1))
+
+    full_h, full_w = image.shape[:2]
+    map_x = cv2.resize(map_x, (full_w, full_h)) / scale
+    map_y = cv2.resize(map_y, (full_w, full_h)) / scale
+    return cv2.remap(
+        image, map_x, map_y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE
+    )
+
+
 def locate_table(image) -> Table:
     """Crop and straighten the nutrition table. Falls back to the whole
     image when no ruled table is found (e.g. tables without lines)."""
@@ -156,8 +212,12 @@ def locate_table(image) -> Table:
     if inverted:
         crop = 255 - crop
 
+    crop = rotate(crop, angle) if abs(angle) > 0.2 else crop
+    if DEWARP:
+        crop = dewarp(crop)
+
     return Table(
-        image=rotate(crop, angle) if abs(angle) > 0.2 else crop,
+        image=crop,
         box=box,
         angle=angle,
         text_height=text_height / scale,

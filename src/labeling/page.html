@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrition Labels</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66;
+    --line: #dcdcd6; --accent: #2457c5; --ok: #1f7a3d; --warn: #a15c00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161615; --panel: #20201e; --text: #ececea; --muted: #a2a29c;
+      --line: #3a3a36; --accent: #7aa2ff; --ok: #5cc483; --warn: #e0a23a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; gap: 16px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  .progress { color: var(--muted); }
+  main { display: grid; grid-template-columns: 1fr 340px; height: calc(100vh - 52px); }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } }
+  .viewer { overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .viewer img { max-width: 100%; cursor: zoom-in; border: 1px solid var(--line); background: #fff; align-self: flex-start; }
+  .viewer img.zoomed { max-width: none; cursor: zoom-out; }
+  .tabs button { margin-right: 6px; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); padding: 16px; overflow: auto; }
+  .code { font-family: ui-monospace, monospace; font-size: 18px; margin-bottom: 4px; }
+  .field { margin: 14px 0; }
+  .field label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  input[type=text] { width: 120px; padding: 8px; font-size: 18px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
+  input[type=text]:focus { outline: 2px solid var(--accent); }
+  .off { color: var(--muted); font-size: 13px; }
+  button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); cursor: pointer; font: inherit; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.small { padding: 3px 8px; font-size: 13px; }
+  .status label { display: block; margin: 4px 0; font-weight: normal; }
+  .saved { color: var(--ok); font-weight: 600; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 16px; }
+  .nav { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  select { padding: 6px; font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nutrition table labels</h1>
+  <select id="queue"></select>
+  <span class="progress" id="progress"></span>
+  <label><input type="checkbox" id="skipDone" checked> skip already labeled</label>
+</header>
+<main>
+  <section class="viewer">
+    <div class="tabs">
+      <button id="showTable">Table crop</button>
+      <button id="showPhoto">Full photo</button>
+      <span class="off">click the image to zoom</span>
+    </div>
+    <img id="image" alt="nutrition table">
+  </section>
+  <aside>
+    <div class="code" id="code"></div>
+    <div id="savedNote"></div>
+
+    <div class="field">
+      <label>Basis of the first column</label>
+      <div class="row">
+        <label><input type="radio" name="basis" value="100g"> 100 g</label>
+        <label><input type="radio" name="basis" value="100ml"> 100 ml</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="added_sugars">Açúcares adicionados (g)</label>
+      <div class="row"><input type="text" id="added_sugars" inputmode="decimal">
+        <button class="small" data-off="added_sugars">= OFF</button></div>
+      <div class="off" id="off_added_sugars"></div>
+    </div>
+    <div class="field">
+      <label for="saturated_fat">Gorduras saturadas (g)</label>
+      <div class="row"><input type="text" id="saturated_fat" inputmode="decimal">
+        <button class="small" data-off="saturated_fat">= OFF</button></div>
+      <div class="off" id="off_saturated_fat"></div>
+    </div>
+    <div class="field">
+      <label for="sodium">Sódio (mg)</label>
+      <div class="row"><input type="text" id="sodium" inputmode="decimal">
+        <button class="small" data-off="sodium">= OFF</button></div>
+      <div class="off" id="off_sodium"></div>
+    </div>
+
+    <div class="field status">
+      <label><b>Photo</b></label>
+      <label><input type="radio" name="status" value="ok" checked> table readable</label>
+      <label><input type="radio" name="status" value="partial"> partly readable (leave unknown values empty)</label>
+      <label><input type="radio" name="status" value="old_format"> old format: no 100 g / 100 ml column (leave values empty)</label>
+      <label><input type="radio" name="status" value="linear"> linear text, no table (values per 100 g/ml)</label>
+      <label><input type="radio" name="status" value="no_table"> no nutrition table / unreadable</label>
+    </div>
+
+    <div class="field">
+      <label for="note">Note</label>
+      <input type="text" id="note" style="width:100%;font-size:14px" placeholder="e.g. both 100 g and 100 ml columns">
+    </div>
+
+    <div class="nav">
+      <button id="prev">← Previous</button>
+      <button class="primary" id="save">Save &amp; next (Enter)</button>
+      <button id="skip">Skip →</button>
+    </div>
+    <p class="hint">Values per 100 g or 100 ml, Both 100 g and 100 ml columns: fill the as-sold one and add a note. Decimal comma is fine (8,7). A row missing from the table: leave it empty.</p>
+  </aside>
+</main>
+<script>
+const NUTRIENTS = ["added_sugars", "saturated_fat", "sodium"];
+let items = [], index = 0, view = "table";
+const $ = id => document.getElementById(id);
+
+function fmt(v) { return v == null || Number.isNaN(v) ? "—" : (+v.toFixed(3)).toString().replace(".", ","); }
+function parseValue(text) {
+  text = text.trim().replace(",", ".");
+  if (text === "") return null;
+  const v = Number(text);
+  return Number.isFinite(v) ? v : NaN;
+}
+
+async function loadQueue(name) {
+  const data = await (await fetch(`/api/queue?name=${encodeURIComponent(name)}`)).json();
+  if (!$("queue").options.length) {
+    for (const q of data.queues) $("queue").add(new Option(q.replace("_", " "), q));
+    $("queue").value = name;
+  }
+  items = data.items;
+  index = 0;
+  if ($("skipDone").checked) next(0);
+  show();
+}
+
+function next(step) {
+  let i = index + step;
+  while ($("skipDone").checked && i < items.length && items[i].label) i++;
+  index = Math.min(Math.max(i, 0), Math.max(items.length - 1, 0));
+}
+
+function show() {
+  const done = items.filter(it => it.label).length;
+  $("progress").textContent = `${index + 1} / ${items.length} · ${done} labeled`;
+  const item = items[index];
+  if (!item) { $("code").textContent = "Queue empty"; return; }
+  $("code").textContent = item.code;
+  $("image").classList.remove("zoomed");
+  $("image").src = `/img/${view}/${item.code}.jpg`;
+  const label = item.label || {};
+  $("savedNote").innerHTML = item.label ? `<span class="saved">✓ saved ${item.label.saved_at || ""}</span>` : "";
+  for (const n of NUTRIENTS) {
+    $(n).value = label[n] == null ? "" : String(label[n]).replace(".", ",");
+    $(`off_${n}`).textContent = `OFF: ${fmt(item.off && item.off[n])}`;
+  }
+  $("note").value = label.note || "";
+  for (const r of document.getElementsByName("basis")) r.checked = r.value === label.basis;
+  for (const r of document.getElementsByName("status")) r.checked = r.value === (label.status || "ok");
+  $("added_sugars").focus();
+}
+
+async function save() {
+  const item = items[index];
+  if (!item) return;
+  const entry = { code: item.code };
+  for (const n of NUTRIENTS) {
+    const v = parseValue($(n).value);
+    if (Number.isNaN(v)) { $(n).focus(); $(n).select(); return alert(`Not a number: ${$(n).value}`); }
+    entry[n] = v;
+  }
+  entry.basis = [...document.getElementsByName("basis")].find(r => r.checked)?.value || null;
+  entry.status = [...document.getElementsByName("status")].find(r => r.checked).value;
+  entry.note = $("note").value.trim() || null;
+  const res = await fetch("/api/label", { method: "POST", body: JSON.stringify(entry) });
+  if (!res.ok) return alert("Save failed");
+  item.label = { ...entry, saved_at: "now" };
+  next(1);
+  show();
+}
+
+for (const b of document.querySelectorAll("[data-off]")) {
+  b.onclick = () => {
+    const n = b.dataset.off, v = items[index]?.off?.[n];
+    if (v != null && !Number.isNaN(v)) $(n).value = String(+v.toFixed(3)).replace(".", ",");
+  };
+}
+$("save").onclick = save;
+$("skip").onclick = () => { next(1); show(); };
+$("prev").onclick = () => { index = Math.max(index - 1, 0); show(); };
+$("showTable").onclick = () => { view = "table"; show(); };
+$("showPhoto").onclick = () => { view = "photo"; show(); };
+$("image").onclick = () => $("image").classList.toggle("zoomed");
+$("image").onerror = () => { if (view === "table") { view = "photo"; show(); view = "table"; } };
+$("queue").onchange = () => loadQueue($("queue").value);
+$("skipDone").onchange = () => { next(0); show(); };
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+});
+loadQueue("val");
+</script>
+</body>
+</html>

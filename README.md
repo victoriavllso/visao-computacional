@@ -31,6 +31,7 @@ All entry points are available as `make` targets from the project root:
 | `make download` | Download the Open Food Facts dataset |
 | `make pipeline` | Run the full processing pipeline |
 | `make test` | Run the unit tests (needs `make setup-dev`) |
+| `make label` | Open the hand-labeling tool (see [LABELING.md](LABELING.md)) |
 
 Typical first-time flow:
 
@@ -196,24 +197,51 @@ photo ─► locate.py ─► ocr.py ─► parse.py ─► NutritionFacts ─�
          the table      Tesseract (por)    per 100 g/ml
 ```
 
-- **Locate** (classical): estimate the text height, keep the ruled lines with morphological opening (kernels of 8× / 4× the text height, so any resolution works), take the connected group of lines with the most line pixels, deskew from the angle of the horizontal lines (Hough).
-- **OCR**: scale the text to ~30 px, adaptive binarization, erase the ruled lines, Tesseract `--psm 11` in Portuguese.
-- **Parse**: match each row on its distinctive word (*adicionados*, *saturadas*, *sódio*) with fuzzy matching, take the first number to its right (the 100 g/ml column comes first). Tolerates OCR errors such as `(g)` read as `(9)`.
+- **Locate** (classical): estimate the text height, keep the ruled lines with morphological opening (kernels of 8× / 4× the text height, so any resolution works), take the connected group of lines with the most line pixels, deskew from the angle of the horizontal lines (Hough), and **dewarp** curved/creased tables: fit a cubic to each horizontal ruled line and remap so the lines become straight (text-line dewarping, applied to ruled lines). Tables with light text on a dark background are inverted.
+- **OCR**: scale the text to ~30 px, adaptive binarization, erase the ruled lines, Tesseract `--psm 11` in Portuguese, with a timeout for pathological images.
+- **Parse**: match each row on its distinctive word (*adicionados* / *adic*, *saturadas*, *sódio*) with fuzzy matching, take the number aligned with the `100 g` header when it is read, else the first number to the right of the label (the 100 g/ml column comes first). Tolerates OCR errors such as `(g)` read as `(9)`; handles side-by-side and linear-text layouts.
+- **Refine**: when a label is found without a value, re-read just that row's value region as a single text line.
 
-**Evaluation** against the Open Food Facts values:
+**Evaluation** against the ground truth (hand labels where they exist, see [LABELING.md](LABELING.md); Open Food Facts values otherwise):
 
 ```bash
-python src/evaluation/back.py --split dev [--limit 150] [--no-locate] [--no-preprocess]
+python src/evaluation/back.py --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name]
 ```
 
-Results on 150 dev products (share of products whose warning decision for each nutrient matches OFF):
+Each metric counts only products whose true value or decision is known. Per nutrient: *label* (row found), *found* (value read), *correct* (within 5%), *decision* (same warning decision as the truth).
 
-| Variant | Added sugars | Sat. fat | Sodium | All three |
-| :--- | ---: | ---: | ---: | ---: |
-| No locate, no preprocessing (raw Tesseract) | 41% | 33% | 33% | 12% |
-| Full pipeline | **59%** | **57%** | **53%** | **31%** |
+### Results (full dev set, 944 products, OFF ground truth)
 
-The OFF values are themselves noisy: in a manual check of 12 disagreements, 3 were OFF errors and the photo was read correctly.
+Share of products whose warning decision matches for all three nutrients, each step added to the previous one:
+
+| Step | All three | Δ |
+| :--- | ---: | ---: |
+| Raw Tesseract on the photo (no locate, no preprocessing)¹ | 12% | |
+| + locate table, scale, binarize, erase lines¹ | 27% | +15 |
+| + parser fixes (units read as digits, drifted values, header variants) | 31.3% | +4 |
+| + column alignment with the `100 g` header | 30.6% | −0.7 (kept: neutral) |
+| + re-read missing values row by row | 33.6% | +3.0 |
+| + dewarping along the ruled lines | **35.8%** | +2.2 |
+
+¹ measured on 150 dev products.
+
+Per nutrient (current): added sugars 59.6%, saturated fat 59.3%, sodium 57.7% correct decisions.
+
+Tried and dropped (all on full dev, relative to the step they were tested on):
+
+| Technique | Result | Why |
+| :--- | :--- | :--- |
+| Other Tesseract layouts (`psm 3/4/6/12`) | −8 to −18 pts | `psm 11` (sparse) handles table cells best |
+| OCR row by row cut along the ruled lines | −15 pts | bent lines merge rows |
+| Widening the box for cut-off labels | −2 pts | locating isn't the bottleneck |
+| Illumination normalization (divide by background) | −0.3 pts | |
+| Sauvola thresholding | −1.5 pts | |
+| Normalization + Sauvola | +0.3 pts | within noise |
+| CLAHE for glare | −6 pts | amplifies texture into false ink |
+| Re-reading **every** value row by row | −9 to −21 pts | single-line reading is noisier than the sparse one |
+| Text heights 24 / 40 / 50 px | −1 to −4 pts | 30 px is best |
+
+**Where errors come from** (per nutrient reading, dev): about 40% correct, 7–15% the label isn't found, 13–21% a wrong number is picked, and 23–39% the true value is never produced by the OCR. The last group (OCR misreading digits, decimal commas) is the main limit of Tesseract on these photos, and includes errors in the OFF values themselves: in a manual check of 12 disagreements, 3 were OFF errors and the photo was read correctly. That's why the ground truth is being corrected by hand.
 
 ---
 

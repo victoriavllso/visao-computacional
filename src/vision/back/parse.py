@@ -38,14 +38,17 @@ class Reading:
     matches: dict = field(default_factory=dict)
     # Nutrients whose label was found, with or without a value.
     labels: set = field(default_factory=set)
+    # Where each found label's values start: (x, row center y, text height).
+    value_spans: dict = field(default_factory=dict)
+    headers: list = field(default_factory=list)
 
 
-# Distinctive word of each label, and words that look similar but belong to
-# other rows.
+# Distinctive words of each label (full and abbreviated: 'Aç. adic.',
+# 'Gord. sat.'), and words that look similar but belong to other rows.
 LABELS = {
-    Nutrient.ADDED_SUGARS: ("adicionados", ()),
-    Nutrient.SATURATED_FAT: ("saturadas", ("insaturadas", "monoinsaturadas")),
-    Nutrient.SODIUM: ("sodio", ()),
+    Nutrient.ADDED_SUGARS: (("adicionados", "adic"), ()),
+    Nutrient.SATURATED_FAT: (("saturadas",), ("insaturadas", "monoinsaturadas")),
+    Nutrient.SODIUM: (("sodio",), ()),
 }
 MIN_SIMILARITY = 0.75
 
@@ -95,16 +98,17 @@ def group_rows(words):
 
 def find_label(row, nutrient):
     """Index of the label's distinctive word in the row, or None."""
-    key, excluded = LABELS[nutrient]
+    keys, excluded = LABELS[nutrient]
 
     for i, word in enumerate(row):
         # Drop a unit glued to the label, e.g. 'Sódio(mg)'.
         token = normalize(re.sub(r"\(.*$", "", word.text))
-        if len(token) < 3 or any(
-            similarity(token, e) > similarity(token, key) for e in excluded
-        ):
+        if len(token) < 3:
             continue
-        if similarity(token, key) >= MIN_SIMILARITY:
+        score = max(similarity(token, key) for key in keys)
+        if any(similarity(token, e) > score for e in excluded):
+            continue
+        if score >= MIN_SIMILARITY:
             return i
 
     return None
@@ -116,6 +120,17 @@ def is_unit(word):
     if "(" in word.text or ")" in word.text:
         return True
     return normalize(word.text) in ("", "g", "mg", "ml")
+
+
+def value_span(row, index):
+    """Where the values of a label start: past the label and its unit."""
+    label = row[index]
+    x = label.right
+    for word in row[index + 1 :]:
+        if not is_unit(word):
+            break
+        x = word.right
+    return x, label.cy, label.h
 
 
 def value_after(row, index):
@@ -154,23 +169,68 @@ HEADER_SOLID = {"100g", "1009"}  # 'g' is often read as '9'
 HEADER_LIQUID = {"100ml", "100mi", "100m1"}
 
 
-def find_basis(rows):
-    """'100 g' / '100 ml' column header, as one word or two."""
+@dataclass(frozen=True)
+class Header:
+    """A '100 g' / '100 ml' column header."""
+
+    cx: float
+    cy: float
+    w: int
+    basis: Basis
+
+
+def find_headers(rows):
+    """'100 g' / '100 ml' column headers, as one word or two. Side-by-side
+    tables have one per half."""
+    headers = []
+
     for row in rows:
         tokens = [normalize(word.text) for word in row]
         for i, token in enumerate(tokens):
             following = tokens[i + 1] if i + 1 < len(tokens) else ""
             if token in HEADER_LIQUID or (token == "100" and following in ("ml", "mi")):
-                return Basis.LIQUID
-            if token in HEADER_SOLID or (token == "100" and following in ("g", "9")):
-                return Basis.SOLID
+                basis = Basis.LIQUID
+            elif token in HEADER_SOLID or (token == "100" and following in ("g", "9")):
+                basis = Basis.SOLID
+            else:
+                continue
 
-    return None
+            words = row[i : i + 1] if token != "100" else row[i : i + 2]
+            x0, x1 = words[0].x, words[-1].right
+            headers.append(Header((x0 + x1) / 2, words[0].cy, x1 - x0, basis))
+
+    return headers
+
+
+def value_in_column(words, label, headers):
+    """Number on the label's row aligned with the first '100 g' column right
+    of the label. Avoids taking the per-portion or %VD value, or a number
+    from a neighboring row."""
+    right = [h for h in headers if h.cx > label.right and h.cy < label.cy]
+    if not right:
+        return None
+    column = min(right, key=lambda h: h.cx)
+    tolerance = max(column.w, 2 * label.h)
+
+    candidates = [
+        word
+        for word in words
+        if word.x > label.right
+        and abs(word.cy - label.cy) <= label.h
+        and abs(word.x + word.w / 2 - column.cx) <= tolerance
+        and not is_unit(word)
+        and parse_number(word.text) is not None
+    ]
+    if not candidates:
+        return None
+    best = min(candidates, key=lambda w: abs(w.x + w.w / 2 - column.cx))
+    return parse_number(best.text)
 
 
 def parse_table(words) -> Reading:
     rows = group_rows(words)
-    values, matches, labels = {}, {}, set()
+    headers = find_headers(rows)
+    values, matches, labels, spans = {}, {}, set(), {}
 
     for nutrient in Nutrient:
         for row in rows:
@@ -178,8 +238,12 @@ def parse_table(words) -> Reading:
             if index is None:
                 continue
             labels.add(nutrient)
+            if nutrient not in spans:
+                spans[nutrient] = value_span(row, index)
 
-            value = value_after(row, index)
+            value = value_in_column(words, row[index], headers)
+            if value is None:
+                value = value_after(row, index)
             if value is None:
                 value = value_near(words, row[index])
             if value is not None:
@@ -188,9 +252,15 @@ def parse_table(words) -> Reading:
                 break
 
     facts = NutritionFacts(
-        basis=find_basis(rows),
+        basis=headers[0].basis if headers else None,
         added_sugars_g=values.get(Nutrient.ADDED_SUGARS),
         saturated_fat_g=values.get(Nutrient.SATURATED_FAT),
         sodium_mg=values.get(Nutrient.SODIUM),
     )
-    return Reading(facts=facts, matches=matches, labels=labels)
+    return Reading(
+        facts=facts,
+        matches=matches,
+        labels=labels,
+        value_spans=spans,
+        headers=headers,
+    )

@@ -21,6 +21,10 @@ OFF_EXPECTED_WARNINGS_FILE: Path = (
     FILTER_PAIRS_OUTPUT_DIR / "off_expected_warnings.parquet"
 )
 
+# Hand labels are versioned (outside data/), to share with the team: one
+# file per person, so git merges never conflict.
+BACK_LABELS_DIR: Path = PROJECT_ROOT / "labels" / "back"
+
 # Selected-image keys used for each side of the package. Open Food Facts has
 # no "back" key: the back of the package is the nutrition table photo.
 FRONT_IMAGE_KEY = "front_pt"
