@@ -1,0 +1,190 @@
+import pytest
+
+from rules.anvisa import Basis
+from vision.back.parse import Word, group_rows, parse_number, parse_table
+
+
+def row(y, *cells, h=20):
+    """Words of one table row; each cell is (x, text)."""
+    return [Word(text, x, y, 10 * len(text), h) for x, text in cells]
+
+
+# Nescau Cereal nutrition table (vertical layout).
+NESCAU = [
+    *row(0, (300, "100"), (340, "g"), (420, "30"), (450, "g"), (520, "%VD*")),
+    *row(
+        40,
+        (0, "Valor"),
+        (60, "energético"),
+        (180, "(kcal)"),
+        (300, "388"),
+        (420, "116"),
+        (520, "6"),
+    ),
+    *row(80, (20, "Açúcares"), (110, "totais"), (180, "(g)"), (300, "30"), (420, "9")),
+    *row(
+        120,
+        (30, "Açúcares"),
+        (120, "adicionados"),
+        (240, "(g)"),
+        (300, "29"),
+        (420, "8,6"),
+        (520, "17"),
+    ),
+    *row(
+        160,
+        (0, "Gorduras"),
+        (90, "totais"),
+        (160, "(g)"),
+        (300, "4,8"),
+        (420, "1,4"),
+        (520, "2"),
+    ),
+    *row(
+        200,
+        (20, "Gorduras"),
+        (110, "monoinsaturadas"),
+        (260, "(g)"),
+        (300, "2,1"),
+        (420, "0,6"),
+    ),
+    *row(
+        240,
+        (20, "Gorduras"),
+        (110, "saturadas"),
+        (210, "(g)"),
+        (300, "1,5"),
+        (420, "0,5"),
+        (520, "8"),
+    ),
+    *row(280, (0, "Sódio"), (60, "(mg)"), (300, "367"), (420, "110"), (520, "5")),
+]
+
+
+def test_vertical_table():
+    facts = parse_table(NESCAU).facts
+
+    assert facts.basis is Basis.SOLID
+    assert facts.added_sugars_g == 29
+    assert facts.saturated_fat_g == 1.5  # not the monoinsaturadas row
+    assert facts.sodium_mg == 367
+
+
+def test_horizontal_table_takes_value_next_to_label():
+    # Side-by-side layout: two label/value groups on the same row.
+    words = [
+        *row(0, (200, "100"), (230, "ml"), (600, "100"), (630, "ml")),
+        *row(
+            40,
+            (0, "Açúcares"),
+            (90, "adicionados"),
+            (200, "7,9"),
+            (300, "3"),
+            (400, "Gorduras"),
+            (490, "saturadas"),
+            (600, "0,2"),
+            (700, "0"),
+        ),
+        *row(
+            80,
+            (0, "Proteínas"),
+            (200, "1,1"),
+            (400, "Sódio"),
+            (460, "(mg)"),
+            (600, "35"),
+        ),
+    ]
+    facts = parse_table(words).facts
+
+    assert facts.basis is Basis.LIQUID
+    assert facts.added_sugars_g == 7.9
+    assert facts.saturated_fat_g == 0.2
+    assert facts.sodium_mg == 35
+
+
+def test_tolerates_ocr_errors():
+    words = [
+        *row(0, (0, "Acucares"), (90, "adlcionados"), (200, "(g)"), (260, "O")),
+        *row(40, (0, "Gorduras"), (90, "saturadas(g)"), (260, "3,O")),
+        *row(80, (0, "S6dio(mg)"), (260, "120mg")),
+    ]
+    facts = parse_table(words).facts
+
+    assert facts.added_sugars_g == 0
+    assert facts.saturated_fat_g == 3.0
+    assert facts.sodium_mg == 120
+
+
+def test_missing_rows_are_none():
+    facts = parse_table(row(0, (0, "Proteínas"), (200, "6,2"))).facts
+
+    assert facts.added_sugars_g is None
+    assert facts.saturated_fat_g is None
+    assert facts.sodium_mg is None
+    assert facts.basis is None
+
+
+def test_rows_group_despite_small_vertical_offsets():
+    words = [
+        Word("Sódio", 0, 100, 50, 20),
+        Word("367", 300, 106, 30, 20),
+        Word("Fibras", 0, 140, 50, 20),
+    ]
+
+    assert [[w.text for w in r] for r in group_rows(words)] == [
+        ["Sódio", "367"],
+        ["Fibras"],
+    ]
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("8,7", 8.7),
+        ("29", 29),
+        ("0,04", 0.04),
+        ("367mg", 367),
+        ("1.5g", 1.5),
+        ("O", 0),
+        ("(g)", None),
+        ("%VD", None),
+        ("<0,5", 0.5),
+        ("", None),
+        ("“29", 29),
+        ("367.", 367),
+        ("S", None),
+    ],
+)
+def test_parse_number(text, expected):
+    assert parse_number(text) == expected
+
+
+def test_unit_misread_as_digit_is_not_the_value():
+    words = row(0, (0, "Açúcares"), (90, "adicionados"), (200, "(9)"), (260, "8,7"))
+
+    assert parse_table(words).facts.added_sugars_g == 8.7
+
+
+def test_value_drifted_out_of_the_row_is_still_found():
+    # Curved package: the number sits lower than its label.
+    words = [
+        Word("Sódio", 0, 100, 50, 20),
+        Word("(mg)", 60, 100, 40, 20),
+        Word("367", 300, 116, 30, 20),
+    ]
+
+    assert parse_table(words).facts.sodium_mg == 367
+
+
+@pytest.mark.parametrize(
+    "header, basis",
+    [
+        (["1009"], Basis.SOLID),
+        (["100", "9"], Basis.SOLID),
+        (["100", "mi"], Basis.LIQUID),
+    ],
+)
+def test_misread_headers(header, basis):
+    words = [Word(t, 300 + 60 * i, 0, 50, 20) for i, t in enumerate(header)]
+
+    assert parse_table(words).facts.basis is basis

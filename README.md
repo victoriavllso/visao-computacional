@@ -185,6 +185,38 @@ Sources: [IN 75/2020](https://www.in.gov.br/en/web/dou/-/instrucao-normativa-in-
 
 ---
 
+## 🔎 Back Pipeline (nutrition table)
+
+**`src/vision/back/`** reads the nutrition table from a photo of the back of the package:
+
+```
+photo ─► locate.py ─► ocr.py ─► parse.py ─► NutritionFacts ─► rules.anvisa.assess
+         find and       scale, binarize,   rows → added sugars,
+         straighten     erase lines,       saturated fat, sodium
+         the table      Tesseract (por)    per 100 g/ml
+```
+
+- **Locate** (classical): estimate the text height, keep the ruled lines with morphological opening (kernels of 8× / 4× the text height, so any resolution works), take the connected group of lines with the most line pixels, deskew from the angle of the horizontal lines (Hough).
+- **OCR**: scale the text to ~30 px, adaptive binarization, erase the ruled lines, Tesseract `--psm 11` in Portuguese.
+- **Parse**: match each row on its distinctive word (*adicionados*, *saturadas*, *sódio*) with fuzzy matching, take the first number to its right (the 100 g/ml column comes first). Tolerates OCR errors such as `(g)` read as `(9)`.
+
+**Evaluation** against the Open Food Facts values:
+
+```bash
+python src/evaluation/back.py --split dev [--limit 150] [--no-locate] [--no-preprocess]
+```
+
+Results on 150 dev products (share of products whose warning decision for each nutrient matches OFF):
+
+| Variant | Added sugars | Sat. fat | Sodium | All three |
+| :--- | ---: | ---: | ---: | ---: |
+| No locate, no preprocessing (raw Tesseract) | 41% | 33% | 33% | 12% |
+| Full pipeline | **59%** | **57%** | **53%** | **31%** |
+
+The OFF values are themselves noisy: in a manual check of 12 disagreements, 3 were OFF errors and the photo was read correctly.
+
+---
+
 ## 📊 Dataset Details
 
 The dataset files are stored in Apache Parquet format:
