@@ -6,7 +6,14 @@ Os rótulos manuais têm prioridade: se um produto foi rotulado à mão, a avali
 
 ## 1. Preparar (uma vez)
 
-Você precisa do ambiente e das imagens. Na raiz do projeto:
+Você precisa do código, do ambiente e das imagens. Enquanto a ferramenta não estiver na `main`, ela está no branch `phase1-data`:
+
+```bash
+git fetch
+git checkout phase1-data
+```
+
+Na raiz do projeto:
 
 ```bash
 make setup
