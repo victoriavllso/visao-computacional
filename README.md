@@ -100,7 +100,7 @@ If you need a custom directory or token, call the script directly:
 
 ```bash
 # Example with a custom target directory and token
-python src/setup/download_dataset.py --local-dir ./my-data --token hf_xxxxxxxxxxxxxxxxxxxxx
+python src/ingestion/download_dataset.py --local-dir ./my-data --token hf_xxxxxxxxxxxxxxxxxxxxx
 ```
 
 ---
@@ -117,23 +117,44 @@ make pipeline
 - `--dataset-dir <path>`: Directory containing the raw dataset files (default: `data/product-database`).
 
 ```bash
-python src/pipeline/pipeline.py --dataset-dir ./my-data
+python src/pipeline/data_pipeline.py --dataset-dir ./my-data
 ```
 
 The pipeline runs the following stages in order:
 
-### Stage 1 — Preprocessing
+### Stage 1 — Filter Brazil
 
-**Filter Brazil** (`src/pipeline/preprocess/filter_brazil.py`)
+**`src/preprocessing/filter_brazil.py`**
 
-Filters `food.parquet` to products whose `countries_tags` field ends with `:brazil`, producing a much smaller dataset scoped to products sold in Brazil. Output is written to `data/brazil/food_brazil.parquet`. A before/after record count is printed to stdout at the end of the stage.
+Filters `food.parquet` to products whose `countries_tags` field ends with `:brazil`. Output: `data/brazil/food_brazil.parquet`.
 
-The filter step can also be run standalone:
+### Stage 2 — Filter front + nutrition pairs
 
-```bash
-python src/pipeline/preprocess/filter_brazil.py
-python src/pipeline/preprocess/filter_brazil.py --dataset-dir ./my-data
-```
+**`src/preprocessing/filter_images.py`**
+
+Keeps products that have both a `front_pt` and a `nutrition_pt` selected photo (Open Food Facts has no "back" key; the back of the package is the nutrition photo), and whose raw photos were both uploaded on or after `REGULATION_CUTOFF` (2023-10-09, end of the RDC 429/2020 transition for products already on the market).
+
+Output: `data/brazil_pairs/products_pairs.parquet`, one row per product with:
+- `front_*` / `nutrition_*`: image id, revision and upload time of each photo;
+- `off_added_sugars_100g`, `off_saturated_fat_100g`, `off_sodium_100g`: Open Food Facts values, used as ground truth for the back pipeline (sodium in g);
+- `split`: `dev` / `val` for products with all three ground-truth values (stable hash of the barcode, 70/30), `unlabeled` otherwise.
+
+### Stage 3 — Download images
+
+**`src/ingestion/download_images.py`**
+
+Downloads the raw (uncropped) photos at full resolution, from the AWS mirror with the Open Food Facts server as fallback, to `data/brazil_pairs/images/{front,nutrition}/{code}.jpg`. Full resolution is needed to read the nutrition table.
+
+### Current numbers (dataset of 2026-10-10)
+
+| Step | Products |
+| :--- | ---: |
+| Full dataset | 4,788,297 |
+| Brazil | 36,446 |
+| `front_pt` + `nutrition_pt`, both since 2023-10-09 | 2,532 |
+| — `dev` | 944 |
+| — `val` | 395 |
+| — `unlabeled` | 1,193 |
 
 ---
 
