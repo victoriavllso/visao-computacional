@@ -30,6 +30,7 @@ All entry points are available as `make` targets from the project root:
 | `make setup-dev` | Same as above, plus dev tools and pre-commit hooks |
 | `make download` | Download the Open Food Facts dataset |
 | `make pipeline` | Run the full processing pipeline |
+| `make test` | Run the unit tests (needs `make setup-dev`) |
 
 Typical first-time flow:
 
@@ -145,6 +146,12 @@ Output: `data/brazil_pairs/products_pairs.parquet`, one row per product with:
 
 Downloads the raw (uncropped) photos at full resolution, from the AWS mirror with the Open Food Facts server as fallback, to `data/brazil_pairs/images/{front,nutrition}/{code}.jpg`. Full resolution is needed to read the nutrition table.
 
+### Stage 4 — Expected warnings from OFF data
+
+**`src/rules/off.py`**
+
+Applies the ANVISA rules (below) to the Open Food Facts values of each product. Output: `data/brazil_pairs/off_expected_warnings.parquet` with, per product, the basis (`100g`/`100ml`, from the package quantity), the Annex XVI exemption, `requires_<nutrient>` and `needs_warning` (`None` when undecidable). This is the reference answer for the image pipelines.
+
 ### Current numbers (dataset of 2026-10-10)
 
 | Step | Products |
@@ -155,6 +162,26 @@ Downloads the raw (uncropped) photos at full resolution, from the AWS mirror wit
 | — `dev` | 944 |
 | — `val` | 395 |
 | — `unlabeled` | 1,193 |
+
+---
+
+## ⚖️ ANVISA Rules
+
+**`src/rules/`** implements the front-of-pack warning rules of RDC 429/2020 and IN 75/2020. It is pure logic: Open Food Facts data and, later, the nutrition table read from the back photo both go through `rules.anvisa.assess`.
+
+**Annex XV** — the warning is required when the amount per 100 g or 100 ml of the food *as sold* is **greater than or equal to** the limit:
+
+| Nutrient | Solids / semi-solids (per 100 g) | Liquids (per 100 ml) | Warning |
+| :--- | :---: | :---: | :--- |
+| Added sugars | 15 g | 7.5 g | ALTO EM AÇÚCAR ADICIONADO |
+| Saturated fat | 6 g | 3 g | ALTO EM GORDURA SATURADA |
+| Sodium | 600 mg | 300 mg | ALTO EM SÓDIO |
+
+**Annex XVI** — foods where the warning is forbidden (`rules/exemptions.py`, mapped to OFF categories):
+- *Forbidden*: milks, milk powder, olive and vegetable oils, salt, infant and enteral formulas, weight control foods, supplements, alcoholic beverages, additives (table sweeteners included), and others.
+- *Conditional*: fruits, vegetables, cereals, nuts, seeds, flours, plain meat and fish, eggs, fermented milks and cheeses are exempt **unless** added ingredients bring added sugars or significant saturated fat / sodium. The data can't tell, so these come out as undecided when a limit is exceeded. Meat products, requeijão and peanut butter are not exempt (ANVISA Q&A 165, 166, 170).
+
+Sources: [IN 75/2020](https://www.in.gov.br/en/web/dou/-/instrucao-normativa-in-n-75-de-8-de-outubro-de-2020-282071143), [ANVISA Q&A on nutrition labeling, 2nd ed.](https://www.gov.br/anvisa/pt-br/centraisdeconteudo/publicacoes/alimentos/perguntas-e-respostas-arquivos/rotulagem-nutricional_2a-edicao.pdf/@@display-file/file)
 
 ---
 

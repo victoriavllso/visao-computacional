@@ -10,6 +10,7 @@ from utils.constants import DATASET_DIR
 from utils.logger import Logger
 from preprocessing.filter_brazil import filter_brazil
 from preprocessing.filter_images import filter_pairs
+from rules.off import expected_warnings_from_off
 import time
 
 log = Logger("pipeline")
@@ -47,6 +48,10 @@ def main() -> None:
     download_pair_images()
     fim = time.perf_counter()
     print(f"tempo de execução: {fim-inicio}")
+
+    log.info("Stage 4 — Expected warnings from OFF data")
+    log.blank()
+    expected_warnings_from_off()
 
     log.blank()
     log.info("Pipeline complete.")

@@ -17,6 +17,9 @@ FILTER_BRAZIL_OUTPUT_FILE: Path = FILTER_BRAZIL_OUTPUT_DIR / "food_brazil.parque
 FILTER_PAIRS_OUTPUT_DIR: Path = DATA_DIR / "brazil_pairs"
 FILTER_PAIRS_OUTPUT_FILE: Path = FILTER_PAIRS_OUTPUT_DIR / "products_pairs.parquet"
 IMAGES_OUTPUT_DIR: Path = FILTER_PAIRS_OUTPUT_DIR / "images"
+OFF_EXPECTED_WARNINGS_FILE: Path = (
+    FILTER_PAIRS_OUTPUT_DIR / "off_expected_warnings.parquet"
+)
 
 # Selected-image keys used for each side of the package. Open Food Facts has
 # no "back" key: the back of the package is the nutrition table photo.

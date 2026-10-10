@@ -1,4 +1,4 @@
-.PHONY: setup setup-dev download pipeline
+.PHONY: setup setup-dev download pipeline test
 
 setup:
 	python3 src/setup/setup_env.py
@@ -11,3 +11,6 @@ download:
 
 pipeline:
 	python3 src/pipeline/data_pipeline.py
+
+test:
+	python3 -m pytest tests
