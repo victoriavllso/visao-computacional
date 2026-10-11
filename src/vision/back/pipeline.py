@@ -42,6 +42,10 @@ MIN_TEXT_BLOBS = 40
 # Skip the learned OCR when the Tesseract pass already says the photo can't
 # be checked (old format, no table).
 GATE_LEARNED_OCR = True
+# Photos with nutrition text but no format evidence even after the learned
+# OCR: TABLE reads them (risk: checking an old per-portion label), OLD_FORMAT
+# abstains (risk: no answer for a readable label). To decide on dev labels.
+UNCERTAIN_AS = PhotoType.TABLE
 
 
 @dataclass
@@ -89,12 +93,18 @@ def read_back(image, locate=True, preprocess=True) -> BackResult:
     photo_features = features(table, words, reading)
     photo_type = classify(photo_features)
 
-    # Stage 3: the slow learned OCR only on photos that can be checked.
-    if ENGINE == "combined" and (photo_type.readable or not GATE_LEARNED_OCR):
+    # Stage 3: the slow learned OCR only on photos that can be checked, or
+    # whose format the fast OCR couldn't tell.
+    needs_learned = photo_type.readable or photo_type is PhotoType.UNCERTAIN
+    if ENGINE == "combined" and (needs_learned or not GATE_LEARNED_OCR):
         learned = read_words_rapidocr(crop)
         reading = combine(parse_table(learned), reading)
         photo_features = features(table, words + learned, reading)
         photo_type = classify(photo_features)
+
+    if photo_type is PhotoType.UNCERTAIN:
+        # Still no format evidence with all the text read.
+        photo_type = UNCERTAIN_AS
 
     return BackResult(reading, table, photo_type, photo_features)
 

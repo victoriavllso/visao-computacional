@@ -9,8 +9,17 @@ an explicit answer instead of a guessed reading.
 
 Classical features: ruled row lines from the table locator (before OCR) and
 keywords in the OCR text (after OCR). Old and new formats only differ in
-their text: the new one requires a 100 g/100 ml column and an "açúcares
-adicionados" row.
+their fixed wording, so the format is decided from positive evidence of each:
+
+    new (RDC 429/2020): 100 g/100 ml column, "açúcares totais" and
+        "açúcares adicionados" rows, footnote "*Percentual de valores
+        diários fornecidos pela porção"
+    old (RDC 360/2003): "Quantidade por porção", footnote "... com base em
+        uma dieta de 2.000 kcal ou 8.400 kJ"
+
+OCR misses words, so absence of new evidence alone doesn't make a photo old:
+with no evidence either way the type is UNCERTAIN, and the pipeline reads it
+again with the learned OCR before deciding.
 """
 
 from dataclasses import dataclass
@@ -25,6 +34,8 @@ class PhotoType(Enum):
     LINEAR = "linear"
     OLD_FORMAT = "old_format"
     NO_TABLE = "no_table"
+    # Nutrition text without format evidence; resolved with more OCR text.
+    UNCERTAIN = "uncertain"
 
     @property
     def readable(self):
@@ -52,6 +63,8 @@ NUTRITION_WORDS = (
     "sodio",
 )
 PER_100 = ("por100g", "por100ml")
+NEW_FORMAT_TEXT = ("acucarestotais", "fornecidospelaporcao")
+OLD_FORMAT_TEXT = ("quantidadeporporcao", "dietade2000", "8400kj")
 
 # Thresholds, to tune on dev hand labels.
 MIN_NUTRITION_WORDS = 3
@@ -65,6 +78,17 @@ class Features:
     has_100_header: bool
     has_added_sugars: bool
     has_per_100_text: bool
+    has_new_format_text: bool
+    has_old_format_text: bool
+
+    @property
+    def new_format_evidence(self):
+        return (
+            self.has_100_header
+            or self.has_added_sugars
+            or self.has_per_100_text
+            or self.has_new_format_text
+        )
 
 
 def features(table, words, reading) -> Features:
@@ -75,14 +99,16 @@ def features(table, words, reading) -> Features:
         has_100_header=bool(reading.headers),
         has_added_sugars=Nutrient.ADDED_SUGARS in reading.labels,
         has_per_100_text=any(phrase in text for phrase in PER_100),
+        has_new_format_text=any(phrase in text for phrase in NEW_FORMAT_TEXT),
+        has_old_format_text=any(phrase in text for phrase in OLD_FORMAT_TEXT),
     )
 
 
 def classify(f: Features) -> PhotoType:
     if f.nutrition_words < MIN_NUTRITION_WORDS:
         return PhotoType.NO_TABLE
-    if not (f.has_100_header or f.has_added_sugars or f.has_per_100_text):
-        return PhotoType.OLD_FORMAT
+    if not f.new_format_evidence:
+        return PhotoType.OLD_FORMAT if f.has_old_format_text else PhotoType.UNCERTAIN
     if f.has_per_100_text and f.ruled_rows < MIN_RULED_ROWS:
         return PhotoType.LINEAR
     return PhotoType.TABLE
