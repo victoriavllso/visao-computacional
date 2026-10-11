@@ -191,11 +191,14 @@ Sources: [IN 75/2020](https://www.in.gov.br/en/web/dou/-/instrucao-normativa-in-
 **`src/vision/back/`** reads the nutrition table from a photo of the back of the package:
 
 ```
-photo ─► locate.py ─► ocr.py ─► parse.py ─► NutritionFacts ─► rules.anvisa.assess
-         find and       scale, binarize,   rows → added sugars,
-         straighten     erase lines,       saturated fat, sodium
-         the table      Tesseract (por)    per 100 g/ml
+photo ─► locate ─► almost no text? ─────────────────────────────► NO_TABLE (no OCR)
+         │
+         └─► Tesseract ─► classify ─► old format? ────────────────► OLD_FORMAT (abstain)
+                                    └─► RapidOCR ─► combine ─► classify ─► TABLE / LINEAR ─► values ─► rules.anvisa.assess
+                                                                        └─► NO_TABLE / OLD_FORMAT (abstain)
 ```
+
+- **Classify** (`classify.py`): what the photo shows, so only photos that can be checked against RDC 429/2020 are read and the others get an explicit answer instead of a guessed reading. `TABLE` / `LINEAR` (new format, read), `OLD_FORMAT` (RDC 360/2003, per portion only, no 100 g/ml column: can't be checked), `NO_TABLE`. Classical features: ruled row lines and character-shaped blobs before OCR; after OCR, positive evidence of each format in the text: new (100 g/ml header, *açúcares totais / adicionados* rows, *"Percentual de valores diários fornecidos pela porção"*), old (*"Quantidade por porção"*, *"dieta de 2.000 kcal ou 8.400 kJ"*). Without evidence either way the photo is read again with the learned OCR before deciding: the fast OCR reading little text isn't evidence of no table. A lone *100 g* only counts next to nutrition words (it is often the net weight).
 
 - **Locate** (classical): estimate the text height, keep the ruled lines with morphological opening (kernels of 8× / 4× the text height, so any resolution works), take the connected group of lines with the most line pixels, deskew from the angle of the horizontal lines (Hough), and **dewarp** curved/creased tables: fit a cubic to each horizontal ruled line and remap so the lines become straight (text-line dewarping, applied to ruled lines). Tables with light text on a dark background are inverted.
 - **OCR**: scale the text to ~30 px, adaptive binarization, erase the ruled lines, Tesseract `--psm 11` in Portuguese, with a timeout for pathological images.
@@ -210,7 +213,20 @@ photo ─► locate.py ─► ocr.py ─► parse.py ─► NutritionFacts ─�
 python src/evaluation/back.py --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name]
 ```
 
-Each metric counts only products whose true value or decision is known. Per nutrient: *label* (row found), *found* (value read), *correct* (within 5%), *decision* (same warning decision as the truth).
+Each metric counts only products whose true value or decision is known. Per nutrient: *label* (row found), *found* (value read), *correct* (within 5%), *decision* (same warning decision as the truth). Photos classified as not readable get no values (the pipeline abstains). The report has the photo type confusion matrix against the hand labels and the metrics on three subsets: all photos end-to-end, predicted readable, and **hand-labeled readable** (the unmasked score).
+
+### Results on hand-labeled dev photos (unmasked)
+
+176 dev photos labeled by hand (126 tables, 16 linear, 6 old format, 28 without a readable table):
+
+| | Value |
+| :--- | ---: |
+| Photo type accuracy | 82.4% |
+| Readable tables wrongly rejected | 0 of 126 |
+| Readable photos with all three warning decisions right | **68.2%** |
+| Decision right: added sugars / saturated fat / sodium | 84.7% / 82.6% / 85.3% |
+
+The OFF-based figures below count unreadable photos (a quarter of them in the hand labels) and OFF errors as failures, so they understate the pipeline.
 
 ### Results (full dev set, 944 products, OFF ground truth)
 
