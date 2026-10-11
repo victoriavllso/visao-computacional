@@ -12,6 +12,7 @@ closing the page loses nothing. See LABELING.md.
 
 import argparse
 import json
+import random
 import re
 import subprocess
 import sys
@@ -64,10 +65,18 @@ def build_queues():
     if EVAL_RESULTS.exists():
         results = pd.read_csv(EVAL_RESULTS, dtype={"code": str})
         disagree = ~results[[f"{n}_correct" for n in NUTRIENTS]].all(axis=1)
-        queues["dev_disagreements"] = sorted(results[disagree].code)
-    queues["dev"] = sorted(products[products.split == "dev"].code)
+        queues["dev_disagreements"] = shuffled(results[disagree].code)
+    queues["dev"] = shuffled(products[products.split == "dev"].code)
 
     return queues, off
+
+
+def shuffled(codes):
+    """Fixed random order: barcodes cluster by manufacturer, so a sorted
+    queue would make any partly labeled prefix a biased sample."""
+    codes = sorted(codes)
+    random.Random(0).shuffle(codes)
+    return codes
 
 
 def valid_code(code):

@@ -31,6 +31,11 @@ class Table:
     angle: float  # rotation applied, in degrees
     text_height: float  # estimated in the original image, in pixels
     inverted: bool  # light text on a dark background, crop already inverted
+    # Horizontal ruled lines spanning most of the table: row separators. A
+    # nutrition table has several; packaging art rarely does.
+    ruled_rows: int = 0
+    # Character-shaped blobs in the whole photo (before OCR).
+    text_blobs: int = 0
 
 
 def binarize(gray):
@@ -40,8 +45,8 @@ def binarize(gray):
     )
 
 
-def estimate_text_height(bw):
-    """Median height of blobs shaped like characters."""
+def char_heights(bw):
+    """Heights of blobs shaped like characters."""
     _, _, stats, _ = cv2.connectedComponentsWithStats(bw)
     height = stats[1:, cv2.CC_STAT_HEIGHT]
     width = stats[1:, cv2.CC_STAT_WIDTH]
@@ -53,7 +58,24 @@ def estimate_text_height(bw):
         & (width <= 3 * height)
         & (area >= 15)
     )
-    return float(np.median(height[is_char])) if is_char.any() else 12.0
+    return height[is_char]
+
+
+def estimate_text_height(bw):
+    """Median height of blobs shaped like characters."""
+    heights = char_heights(bw)
+    return float(np.median(heights)) if len(heights) else 12.0
+
+
+def count_text_blobs(bw, text_height):
+    """Character-shaped blobs of about the text height: a nutrition table
+    has hundreds; a barcode or a front panel far fewer of that size."""
+    heights = char_heights(bw)
+    return int(
+        np.count_nonzero(
+            (heights >= 0.6 * text_height) & (heights <= 1.6 * text_height)
+        )
+    )
 
 
 def line_masks(bw, text_height):
@@ -186,6 +208,18 @@ def dewarp(image):
     )
 
 
+RULED_ROW_SPAN = 0.5  # of the table width
+# A box smaller than this fraction of the photo on either side is a stray
+# group of lines (e.g. a thin strip), not the table: use the whole photo.
+MIN_BOX_SIDE = 0.15
+
+
+def count_ruled_rows(h_lines, box):
+    x, y, w, h = box
+    n, _, stats, _ = cv2.connectedComponentsWithStats(h_lines[y : y + h, x : x + w])
+    return int(np.count_nonzero(stats[1:, cv2.CC_STAT_WIDTH] >= RULED_ROW_SPAN * w))
+
+
 def locate_table(image) -> Table:
     """Crop and straighten the nutrition table. Falls back to the whole
     image when no ruled table is found (e.g. tables without lines)."""
@@ -196,6 +230,13 @@ def locate_table(image) -> Table:
     text_height = estimate_text_height(bw)
     h_lines, v_lines = line_masks(bw, text_height)
     box, _ = find_table_box(h_lines, v_lines, text_height)
+    if box is not None and (
+        box[2] < MIN_BOX_SIDE * bw.shape[1] or box[3] < MIN_BOX_SIDE * bw.shape[0]
+    ):
+        box = None
+    text_blobs = count_text_blobs(bw, text_height)
+
+    ruled_rows = count_ruled_rows(h_lines, box) if box is not None else 0
 
     if box is not None:
         x, y, w, h = (int(round(v / scale)) for v in box)
@@ -222,4 +263,6 @@ def locate_table(image) -> Table:
         angle=angle,
         text_height=text_height / scale,
         inverted=inverted,
+        ruled_rows=ruled_rows,
+        text_blobs=text_blobs,
     )

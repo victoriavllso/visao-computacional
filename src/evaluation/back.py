@@ -31,10 +31,11 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import pandas as pd
 
-from rules.anvisa import Nutrient, assess
+from rules.anvisa import Nutrient, NutritionFacts, assess
 from labeling.labels import load_labels, truth_facts
 from utils.constants import DATA_DIR, FILTER_PAIRS_OUTPUT_FILE, IMAGES_OUTPUT_DIR
 from utils.logger import Logger
+from vision.back.classify import STATUS_TYPES, PhotoType
 from vision.back.pipeline import read_back
 
 log = Logger("eval back")
@@ -58,7 +59,13 @@ def evaluate_product(args):
     product = SimpleNamespace(**product)
     path = IMAGES_OUTPUT_DIR / "nutrition" / f"{product.code}.jpg"
     truth, source = truth_facts(product, labels)
-    row = {"code": product.code, "truth": source}
+    label = labels.get(str(product.code))
+    true_type = STATUS_TYPES.get(label["status"]) if label else None
+    row = {
+        "code": product.code,
+        "truth": source,
+        "true_type": None if true_type is None else true_type.value,
+    }
 
     try:
         result = read_back(str(path), locate=locate, preprocess=preprocess)
@@ -66,7 +73,16 @@ def evaluate_product(args):
         row["error"] = repr(error)
         return row
 
-    read = result.reading.facts
+    row["photo_type"] = result.photo_type.value
+    row.update({f"f_{k}": v for k, v in vars(result.features).items()})
+
+    # A photo classified as not readable gets no values: the pipeline
+    # abstains, as the app would ("old label", "no table found").
+    read = (
+        result.reading.facts
+        if result.readable
+        else NutritionFacts(None, None, None, None)
+    )
     row["basis_read"] = None if read.basis is None else read.basis.value
     for nutrient in Nutrient:
         name = nutrient.value
@@ -114,7 +130,33 @@ def summarize(results):
     errors = results["error"].notna().sum() if "error" in results else 0
     log.info(f"Products: {len(results)}   errors: {errors}")
     log.info(f"Ground truth: {results.truth.value_counts().to_dict()}")
-    log.blank()
+    log.info(f"Photo types: {results.photo_type.value_counts().to_dict()}")
+
+    typed = results[results.true_type.notna()]
+    if len(typed):
+        log.blank()
+        log.info(f"Photo type vs hand labels ({len(typed)} products), rows = true:")
+        print(pd.crosstab(typed.true_type, typed.photo_type, margins=True))
+        log.info(
+            f"Photo type accuracy: {(typed.true_type == typed.photo_type).mean():.1%}"
+        )
+
+    readable = {PhotoType.TABLE.value, PhotoType.LINEAR.value}
+    subsets = {
+        "All photos, end-to-end (abstaining counts as wrong)": results,
+        "Predicted readable": results[results.photo_type.isin(readable)],
+    }
+    if len(typed):
+        subsets["Hand-labeled readable (unmasked)"] = typed[
+            typed.true_type.isin(readable)
+        ]
+    for title, subset in subsets.items():
+        log.blank()
+        log.info(f"{title}: {len(subset)} products")
+        metrics(subset)
+
+
+def metrics(results):
     print(f"{'nutrient':<15} {'label':>7} {'found':>7} {'correct':>8} {'decision':>9}")
     for nutrient in Nutrient:
         name = nutrient.value
@@ -127,9 +169,10 @@ def summarize(results):
         )
 
     # Products where all three decisions are known and correct.
-    decisions = results[[f"{n.value}_decision_correct" for n in Nutrient]]
-    complete = decisions.dropna()
-    log.blank()
+    columns = [f"{n.value}_decision_correct" for n in Nutrient]
+    if not set(columns) <= set(results.columns):
+        return
+    complete = results[columns].dropna()
     log.info(
         f"All three decisions correct: {complete.astype(bool).all(axis=1).mean():.1%}"
         f" (of {len(complete)} products with all three decisions known)"

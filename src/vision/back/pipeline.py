@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 import cv2
 
 from rules.anvisa import Nutrient, NutritionFacts
+from vision.back.classify import Features, PhotoType, classify, features
 from vision.back.locate import Table, locate_table
 from vision.back.ocr import (
     TARGET_TEXT_HEIGHT,
@@ -35,12 +36,26 @@ REFINE = "fill"
 # small cells such as a lone '0'. On 300 dev products, all three decisions
 # right: Tesseract 41%, RapidOCR 23%, combined 51%.
 ENGINE = "combined"
+# Photos with fewer character-shaped blobs are rejected before any OCR.
+# Conservative: barcodes and icons also look like characters.
+MIN_TEXT_BLOBS = 40
+# Skip the learned OCR when the Tesseract pass already says the photo can't
+# be checked (old format, no table).
+GATE_LEARNED_OCR = True
 
 
 @dataclass
 class BackResult:
     reading: Reading
     table: Table | None
+    photo_type: PhotoType
+    features: Features
+
+    @property
+    def readable(self):
+        """Only readings of new-format tables or linear text can be checked
+        against RDC 429/2020."""
+        return self.photo_type.readable
 
 
 def read_back(image, locate=True, preprocess=True) -> BackResult:
@@ -54,18 +69,34 @@ def read_back(image, locate=True, preprocess=True) -> BackResult:
     table = locate_table(image) if locate else None
     crop = table.image if table is not None else image
 
+    # Stage 1, before OCR: only photos with almost no text are rejected.
+    if table is not None and table.text_blobs < MIN_TEXT_BLOBS:
+        empty = parse_table([])
+        photo_features = features(table, [], empty)
+        return BackResult(empty, table, PhotoType.NO_TABLE, photo_features)
+
+    # Stage 2, after the fast OCR: the format is in the text.
     if ENGINE == "rapidocr":
-        return BackResult(reading=parse_table(read_words_rapidocr(crop)), table=table)
+        words = read_words_rapidocr(crop)
+        reading = parse_table(words)
+    else:
+        clean = prepare(crop) if preprocess else crop
+        words = read_words(clean, preprocess=False)
+        reading = parse_table(words)
+        if REFINE and preprocess:
+            reading = refine(clean, reading)
 
-    clean = prepare(crop) if preprocess else crop
-    words = read_words(clean, preprocess=False)
-    reading = parse_table(words)
-    if REFINE and preprocess:
-        reading = refine(clean, reading)
+    photo_features = features(table, words, reading)
+    photo_type = classify(photo_features)
 
-    if ENGINE == "combined":
-        reading = combine(parse_table(read_words_rapidocr(crop)), reading)
-    return BackResult(reading=reading, table=table)
+    # Stage 3: the slow learned OCR only on photos that can be checked.
+    if ENGINE == "combined" and (photo_type.readable or not GATE_LEARNED_OCR):
+        learned = read_words_rapidocr(crop)
+        reading = combine(parse_table(learned), reading)
+        photo_features = features(table, words + learned, reading)
+        photo_type = classify(photo_features)
+
+    return BackResult(reading, table, photo_type, photo_features)
 
 
 def combine(primary, fallback):
