@@ -79,6 +79,24 @@ def shuffled(codes):
     return codes
 
 
+REVIEW_NOTES = ("100g header", "100 g header", "per portion", "por porção")
+
+
+def review_queue(labels):
+    """Labels to check again: readable without a basis marked (a 100 g/ml
+    column must be there, else it's old format), or a note doubting it."""
+    readable = {"ok", "partial", "linear"}
+    return sorted(
+        code
+        for code, label in labels.items()
+        if label.get("status") in readable
+        and (
+            not label.get("basis")
+            or any(n in (label.get("note") or "").lower() for n in REVIEW_NOTES)
+        )
+    )
+
+
 def valid_code(code):
     return code.isdigit() and len(code) <= 20
 
@@ -118,13 +136,16 @@ class Handler(BaseHTTPRequestHandler):
 
         if url.path == "/api/queue":
             name = parse_qs(url.query).get("name", ["val"])[0]
-            codes = self.queues.get(name, [])
             labels = load_labels()
+            # Computed per request: fixed labels drop out right away.
+            codes = (
+                review_queue(labels) if name == "review" else self.queues.get(name, [])
+            )
             items = [
                 {"code": c, "off": self.off.get(c), "label": labels.get(c)}
                 for c in codes
             ]
-            return self.send_json({"queues": list(self.queues), "items": items})
+            return self.send_json({"queues": [*self.queues, "review"], "items": items})
 
         if len(parts) == 3 and parts[0] == "img" and parts[2].endswith(".jpg"):
             kind, code = parts[1], parts[2][:-4]

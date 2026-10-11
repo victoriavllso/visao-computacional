@@ -28,6 +28,8 @@ def make(**overrides):
         (dict(has_old_format_text=True), PhotoType.OLD_FORMAT),
         # New evidence wins: a new table can mention 'porção'.
         (dict(has_old_format_text=True, has_100_header=True), PhotoType.TABLE),
+        # Transitional label: added sugars row, but per portion only.
+        (dict(has_old_format_text=True, has_added_sugars=True), PhotoType.OLD_FORMAT),
         # No evidence either way: not old just because OCR missed '100 g'.
         (dict(), PhotoType.UNCERTAIN),
     ],

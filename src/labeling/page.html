@@ -196,7 +196,11 @@ $("showTable").onclick = () => { view = "table"; show(); };
 $("showPhoto").onclick = () => { view = "photo"; show(); };
 $("image").onclick = () => $("image").classList.toggle("zoomed");
 $("image").onerror = () => { if (view === "table") { view = "photo"; show(); view = "table"; } };
-$("queue").onchange = () => loadQueue($("queue").value);
+$("queue").onchange = () => {
+  // The review queue holds labeled products: don't skip them.
+  $("skipDone").checked = $("queue").value !== "review";
+  loadQueue($("queue").value);
+};
 $("skipDone").onchange = () => { next(0); show(); };
 document.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }

@@ -107,6 +107,10 @@ def features(table, words, reading) -> Features:
 def classify(f: Features) -> PhotoType:
     if f.nutrition_words < MIN_NUTRITION_WORDS:
         return PhotoType.NO_TABLE
+    # No 100 g/100 ml column means old format, even for transitional labels
+    # that already have an "açúcares adicionados" row: per portion only.
+    if f.has_old_format_text and not (f.has_100_header or f.has_per_100_text):
+        return PhotoType.OLD_FORMAT
     if not f.new_format_evidence:
         return PhotoType.OLD_FORMAT if f.has_old_format_text else PhotoType.UNCERTAIN
     if f.has_per_100_text and f.ruled_rows < MIN_RULED_ROWS:
