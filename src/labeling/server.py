@@ -82,19 +82,43 @@ def shuffled(codes):
 REVIEW_NOTES = ("100g header", "100 g header", "per portion", "por porção")
 
 
+def latest_photo_types():
+    """{barcode: photo type} from the most recent evaluation that classified
+    photos, or {} if there is none."""
+    runs = [
+        path
+        for path in (DATA_DIR / "evaluation").glob("back_*.csv")
+        if "photo_type" in path.open().readline().split(",")
+    ]
+    if not runs:
+        return {}
+    latest = max(runs, key=lambda path: path.stat().st_mtime)
+    results = pd.read_csv(latest, dtype={"code": str}, usecols=["code", "photo_type"])
+    return dict(zip(results.code, results.photo_type))
+
+
 def review_queue(labels):
-    """Labels to check again: readable without a basis marked (a 100 g/ml
-    column must be there, else it's old format), or a note doubting it."""
+    """{barcode: reason} for labels to check again:
+    - readable without a basis marked: a 100 g/ml column must be there, else
+      it's old format;
+    - a note doubting the 100 g header;
+    - labeled "no table" where the pipeline found and read a table."""
     readable = {"ok", "partial", "linear"}
-    return sorted(
-        code
-        for code, label in labels.items()
-        if label.get("status") in readable
-        and (
-            not label.get("basis")
-            or any(n in (label.get("note") or "").lower() for n in REVIEW_NOTES)
-        )
-    )
+    photo_types = latest_photo_types()
+    reasons = {}
+
+    for code, label in labels.items():
+        status, note = label.get("status"), (label.get("note") or "").lower()
+        if status in readable and not label.get("basis"):
+            reasons[code] = "readable, but no 100 g / 100 ml marked"
+        elif status in readable and any(n in note for n in REVIEW_NOTES):
+            reasons[code] = "note doubts the 100 g header"
+        elif status == "no_table" and photo_types.get(code) in ("table", "linear"):
+            reasons[code] = (
+                f"labeled no table, but the pipeline read a {photo_types[code]}"
+            )
+
+    return dict(sorted(reasons.items()))
 
 
 def valid_code(code):
@@ -138,11 +162,15 @@ class Handler(BaseHTTPRequestHandler):
             name = parse_qs(url.query).get("name", ["val"])[0]
             labels = load_labels()
             # Computed per request: fixed labels drop out right away.
-            codes = (
-                review_queue(labels) if name == "review" else self.queues.get(name, [])
-            )
+            reasons = review_queue(labels) if name == "review" else {}
+            codes = list(reasons) if name == "review" else self.queues.get(name, [])
             items = [
-                {"code": c, "off": self.off.get(c), "label": labels.get(c)}
+                {
+                    "code": c,
+                    "off": self.off.get(c),
+                    "label": labels.get(c),
+                    "reason": reasons.get(c),
+                }
                 for c in codes
             ]
             return self.send_json({"queues": [*self.queues, "review"], "items": items})

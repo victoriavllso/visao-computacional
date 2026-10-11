@@ -153,7 +153,8 @@ function show() {
   $("image").classList.remove("zoomed");
   $("image").src = `/img/${view}/${item.code}.jpg`;
   const label = item.label || {};
-  $("savedNote").innerHTML = item.label ? `<span class="saved">✓ saved ${item.label.saved_at || ""}</span>` : "";
+  $("savedNote").innerHTML = (item.label ? `<span class="saved">✓ saved ${item.label.saved_at || ""}</span>` : "")
+    + (item.reason ? `<div class="off">Review: ${item.reason}${item.label?.note ? ` · note: ${item.label.note}` : ""}</div>` : "");
   for (const n of NUTRIENTS) {
     $(n).value = label[n] == null ? "" : String(label[n]).replace(".", ",");
     $(`off_${n}`).textContent = `OFF: ${fmt(item.off && item.off[n])}`;
