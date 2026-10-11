@@ -93,9 +93,10 @@ def read_back(image, locate=True, preprocess=True) -> BackResult:
     photo_features = features(table, words, reading)
     photo_type = classify(photo_features)
 
-    # Stage 3: the slow learned OCR only on photos that can be checked, or
-    # whose format the fast OCR couldn't tell.
-    needs_learned = photo_type.readable or photo_type is PhotoType.UNCERTAIN
+    # Stage 3: the slow learned OCR, skipped only on positive evidence of an
+    # old label. The fast OCR reading little text isn't evidence of no table
+    # (on dev, 20 of 116 tables were rejected that way).
+    needs_learned = photo_type is not PhotoType.OLD_FORMAT
     if ENGINE == "combined" and (needs_learned or not GATE_LEARNED_OCR):
         learned = read_words_rapidocr(crop)
         reading = combine(parse_table(learned), reading)

@@ -69,6 +69,8 @@ OLD_FORMAT_TEXT = ("quantidadeporporcao", "dietade2000", "8400kj")
 # Thresholds, to tune on dev hand labels.
 MIN_NUTRITION_WORDS = 3
 MIN_RULED_ROWS = 3
+# Nutrition words needed for a '100 g' header to count.
+MIN_HEADER_CONTEXT = 2
 
 
 @dataclass(frozen=True)
@@ -83,8 +85,10 @@ class Features:
 
     @property
     def new_format_evidence(self):
+        # A lone '100 g' is often the net weight printed on the package.
+        header = self.has_100_header and self.nutrition_words >= MIN_HEADER_CONTEXT
         return (
-            self.has_100_header
+            header
             or self.has_added_sugars
             or self.has_per_100_text
             or self.has_new_format_text
@@ -105,7 +109,9 @@ def features(table, words, reading) -> Features:
 
 
 def classify(f: Features) -> PhotoType:
-    if f.nutrition_words < MIN_NUTRITION_WORDS:
+    # A 100 g header or an added sugars row is a nutrition table, however
+    # little else the OCR read.
+    if f.nutrition_words < MIN_NUTRITION_WORDS and not f.new_format_evidence:
         return PhotoType.NO_TABLE
     # No 100 g/100 ml column means old format, even for transitional labels
     # that already have an "açúcares adicionados" row: per portion only.

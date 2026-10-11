@@ -21,6 +21,10 @@ def make(**overrides):
     "overrides, expected",
     [
         (dict(nutrition_words=1), PhotoType.NO_TABLE),
+        # A header or added sugars row is enough, even with little text read.
+        (dict(nutrition_words=2, has_100_header=True), PhotoType.TABLE),
+        # A lone '100 g' is usually the net weight on the package.
+        (dict(nutrition_words=0, has_100_header=True), PhotoType.NO_TABLE),
         (dict(has_100_header=True), PhotoType.TABLE),
         (dict(has_new_format_text=True), PhotoType.TABLE),
         (dict(has_added_sugars=True, ruled_rows=0), PhotoType.TABLE),
