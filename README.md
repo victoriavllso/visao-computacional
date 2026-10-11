@@ -215,6 +215,21 @@ python src/evaluation/back.py --split dev [--hand-only] [--limit N] [--no-locate
 
 Each metric counts only products whose true value or decision is known. Per nutrient: *label* (row found), *found* (value read), *correct* (within 5%), *decision* (same warning decision as the truth). Photos classified as not readable get no values (the pipeline abstains). The report has the photo type confusion matrix against the hand labels and the metrics on three subsets: all photos end-to-end, predicted readable, and **hand-labeled readable** (the unmasked score).
 
+### Final score: validation set (held out, hand-labeled)
+
+All 395 val products labeled by hand (280 tables, 36 linear, 46 old format, 33 without a readable table). Nothing was tuned on val, so this is the honest estimate:
+
+| | Value |
+| :--- | ---: |
+| **Readable photos with all three warning decisions right** | **57.1%** |
+| Decision right: added sugars / saturated fat / sodium | 76.9% / 72.7% / 79.1% |
+| When the pipeline says "readable": all three right | 59.9% |
+| Photo type accuracy | 82.8% |
+| Readable tables left without an answer | 7 of 280 |
+| Old-format labels wrongly checked as tables | 14 of 46 |
+
+About 9 points below dev (66.5%): the decisions made on dev errors fit dev better than new photos. Val also has twice the share of old-format labels (12% vs 6%), and old-format detection is what generalizes worst. Improvements are developed on dev; val is only for checking them at the end.
+
 ### Results on hand-labeled dev photos (unmasked)
 
 255 dev photos labeled by hand (187 tables, 20 linear, 15 old format, 33 without a readable table):

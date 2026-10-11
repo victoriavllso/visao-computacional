@@ -32,7 +32,7 @@ source .venv/bin/activate
 python src/labeling/server.py --labeler seu-nome
 ```
 
-Abra <http://localhost:8765> no navegador. Use sempre o **mesmo** `--labeler` (sem espaços): seus rótulos vão para `labels/back/seu-nome.jsonl`. Um arquivo por pessoa, assim o `git pull` nunca dá conflito.
+Abra <http://localhost:8765> no navegador. Os rótulos vão para `labels/back/<labeler>.jsonl` (sem `--labeler`: `labels/back/hand-labeled.jsonl`, que já tem os rótulos feitos até agora). Se mais de uma pessoa estiver rotulando, cada uma usa o **seu** `--labeler` (sem espaços), sempre o mesmo: um arquivo por pessoa, assim o `git pull` nunca dá conflito.
 
 ## 3. Rotular
 
@@ -74,7 +74,7 @@ Envie com frequência, para os outros não repetirem os mesmos produtos:
 
 ```bash
 git pull
-git add labels/back/seu-nome.jsonl
+git add labels/back/
 git commit -m "labels: +N produtos"
 git push
 ```

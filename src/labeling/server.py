@@ -4,17 +4,16 @@ Shows each product's nutrition photo and saves the values read by a person
 (added sugars, saturated fat, sodium per 100 g/ml) as the ground truth for
 the back pipeline, replacing the noisy Open Food Facts values.
 
-    python src/labeling/server.py --labeler <your-name> [--port 8765]
+    python src/labeling/server.py [--labeler <name>] [--port 8765]
 
-Labels are appended to labels/back/<your-name>.jsonl as they are saved, so
-closing the page loses nothing. See LABELING.md.
+Labels are appended to labels/back/<name>.jsonl (default: hand-labeled.jsonl)
+as they are saved, so closing the page loses nothing. See LABELING.md.
 """
 
 import argparse
 import json
 import random
 import re
-import subprocess
 import sys
 import time
 from functools import lru_cache
@@ -79,6 +78,7 @@ def shuffled(codes):
     return codes
 
 
+DEFAULT_LABELER = "hand-labeled"
 REVIEW_NOTES = ("100g header", "100 g header", "per portion", "por porção")
 
 
@@ -207,27 +207,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True})
 
 
-def default_labeler():
-    """The git user name, if set."""
-    try:
-        name = subprocess.run(
-            ["git", "config", "user.name"], capture_output=True, text=True
-        ).stdout.strip()
-    except OSError:
-        return None
-    return name or None
-
-
 def main():
     parser = argparse.ArgumentParser(description="Hand-label nutrition values.")
     parser.add_argument(
-        "--labeler", default=default_labeler(), help="your name (default: git user)"
+        "--labeler",
+        default=DEFAULT_LABELER,
+        help=f"label file name; one per person avoids git conflicts (default: {DEFAULT_LABELER})",
     )
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
-    if not args.labeler:
-        parser.error("pass --labeler <your-name>")
     labeler = re.sub(r"[^A-Za-z0-9_-]", "_", args.labeler)
 
     Handler.queues, Handler.off = build_queues()
