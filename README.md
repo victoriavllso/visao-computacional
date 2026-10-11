@@ -217,14 +217,17 @@ Each metric counts only products whose true value or decision is known. Per nutr
 
 ### Results on hand-labeled dev photos (unmasked)
 
-176 dev photos labeled by hand (126 tables, 16 linear, 6 old format, 28 without a readable table):
+255 dev photos labeled by hand (187 tables, 20 linear, 15 old format, 33 without a readable table):
 
 | | Value |
 | :--- | ---: |
-| Photo type accuracy | 82.4% |
-| Readable tables wrongly rejected | 0 of 126 |
-| Readable photos with all three warning decisions right | **68.2%** |
-| Decision right: added sugars / saturated fat / sodium | 84.7% / 82.6% / 85.3% |
+| Photo type accuracy | 84.7% |
+| Readable tables wrongly rejected (no answer) | 4 of 187 |
+| Old-format labels wrongly checked as tables | 2 of 15 |
+| Readable photos with all three warning decisions right | **66.5%** |
+| Decision right: added sugars / saturated fat / sodium | 84.1% / 83.5% / 82.5% |
+
+Photos with no format evidence even after both OCR engines are treated as old format (abstain): of the 10 such photos, 6 were old format and none of the 3 tables among them was read right. With 176 labels the headline was 68.2%; the difference is within noise.
 
 The OFF-based figures below count unreadable photos (a quarter of them in the hand labels) and OFF errors as failures, so they understate the pipeline.
 

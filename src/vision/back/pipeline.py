@@ -44,8 +44,10 @@ MIN_TEXT_BLOBS = 40
 GATE_LEARNED_OCR = True
 # Photos with nutrition text but no format evidence even after the learned
 # OCR: TABLE reads them (risk: checking an old per-portion label), OLD_FORMAT
-# abstains (risk: no answer for a readable label). To decide on dev labels.
-UNCERTAIN_AS = PhotoType.TABLE
+# abstains (risk: no answer for a readable label). On 255 dev hand labels the
+# 10 uncertain photos were 6 old format, 3 tables, 1 no table, and none of
+# the 3 tables was read right: abstain.
+UNCERTAIN_AS = PhotoType.OLD_FORMAT
 
 
 @dataclass
