@@ -9,6 +9,8 @@ ruled lines. Curved or wrinkled packages bend the lines, rows get merged,
 and the decision accuracy on dev fell from 27% to 12%.
 """
 
+import os
+
 import cv2
 import numpy as np
 import pytesseract
@@ -136,6 +138,55 @@ def read_row(clean, x0, y0, x1, y1, lang="por") -> list[Word]:
         )
         if text.strip() and float(conf) >= 0
     ]
+
+
+_rapidocr = None
+
+
+def _limit_onnx_threads():
+    """RapidOCR doesn't expose ONNX Runtime's thread count, and by default
+    each process uses every core. ORT_THREADS (e.g. 1 per worker when
+    evaluating in parallel) is applied to the sessions it creates."""
+    threads = int(os.environ.get("ORT_THREADS", 0))
+    if not threads:
+        return
+
+    import onnxruntime
+
+    original = onnxruntime.SessionOptions
+
+    def session_options():
+        options = original()
+        options.intra_op_num_threads = threads
+        options.inter_op_num_threads = 1
+        return options
+
+    onnxruntime.SessionOptions = session_options
+
+
+def read_words_rapidocr(image) -> list[Word]:
+    """Learned OCR (PaddleOCR models through RapidOCR / ONNX Runtime), on the
+    color crop: it is trained on photos, binarizing first makes it worse.
+    Returns one Word per detected text line, e.g. 'Gorduras saturadas (g)'."""
+    global _rapidocr
+    if _rapidocr is None:
+        _limit_onnx_threads()
+        from rapidocr_onnxruntime import RapidOCR
+
+        _rapidocr = RapidOCR()
+
+    if image.ndim == 2:
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    result, _ = _rapidocr(image)
+
+    words = []
+    for box, text, score in result or []:
+        xs, ys = [p[0] for p in box], [p[1] for p in box]
+        x, y = int(min(xs)), int(min(ys))
+        words.append(
+            Word(text, x, y, int(max(xs)) - x, int(max(ys)) - y, 100 * float(score))
+        )
+    return words
 
 
 def read_words(image, preprocess=True, lang="por") -> list[Word]:

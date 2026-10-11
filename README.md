@@ -201,6 +201,8 @@ photo ─► locate.py ─► ocr.py ─► parse.py ─► NutritionFacts ─�
 - **OCR**: scale the text to ~30 px, adaptive binarization, erase the ruled lines, Tesseract `--psm 11` in Portuguese, with a timeout for pathological images.
 - **Parse**: match each row on its distinctive word (*adicionados* / *adic*, *saturadas*, *sódio*) with fuzzy matching, take the number aligned with the `100 g` header when it is read, else the first number to the right of the label (the 100 g/ml column comes first). Tolerates OCR errors such as `(g)` read as `(9)`; handles side-by-side and linear-text layouts.
 - **Refine**: when a label is found without a value, re-read just that row's value region as a single text line.
+- **Learned OCR, combined** (`pipeline.ENGINE = "combined"`, default): RapidOCR (PaddleOCR models on ONNX Runtime, CPU) reads the located and dewarped **color** crop; each nutrient takes RapidOCR's value, or Tesseract's where RapidOCR has none. RapidOCR is more accurate when it reads a value, but its text detector misses isolated small cells such as a lone `0`, which Tesseract reads. Classical binarization helps Tesseract but makes RapidOCR worse (it is trained on photos), so each engine gets its own input.
+- **"Não contém quantidades significativas de …"**: nutrients listed in this sentence (RDC 429/2020 simplified tables) count as 0.
 
 **Evaluation** against the ground truth (hand labels where they exist, see [LABELING.md](LABELING.md); Open Food Facts values otherwise):
 
@@ -221,11 +223,15 @@ Share of products whose warning decision matches for all three nutrients, each s
 | + parser fixes (units read as digits, drifted values, header variants) | 31.3% | +4 |
 | + column alignment with the `100 g` header | 30.6% | −0.7 (kept: neutral) |
 | + re-read missing values row by row | 33.6% | +3.0 |
-| + dewarping along the ruled lines | **35.8%** | +2.2 |
+| + dewarping along the ruled lines | 35.8% | +2.2 |
+| + values from the label's own row first | 36.5% | +0.7 |
+| + learned OCR (RapidOCR) combined with Tesseract | **44.5%** | +8.0 |
 
 ¹ measured on 150 dev products.
 
-Per nutrient (current): added sugars 59.6%, saturated fat 59.3%, sodium 57.7% correct decisions.
+Per nutrient (current): added sugars 63.6%, saturated fat 68.2%, sodium 69.8% correct decisions.
+
+The combination rule was chosen on 300 dev products; on the other 644 it gives 42.6% vs 35.1% for Tesseract alone (+7.5), so it isn't fitted to the sample. On the 300: Tesseract 41%, RapidOCR alone 23%, combined 51%. When both engines read a value and agree, it is right 71–85% of the time, a confidence signal for later. Cost: two OCR engines per photo.
 
 Tried and dropped (all on full dev, relative to the step they were tested on):
 
@@ -240,6 +246,9 @@ Tried and dropped (all on full dev, relative to the step they were tested on):
 | CLAHE for glare | −6 pts | amplifies texture into false ink |
 | Re-reading **every** value row by row | −9 to −21 pts | single-line reading is noisier than the sparse one |
 | Text heights 24 / 40 / 50 px | −1 to −4 pts | 30 px is best |
+| RapidOCR alone | −18 pts vs Tesseract (300 dev) | detector misses isolated small numbers (added sugars is often `0`) |
+| RapidOCR on the binarized image | worse on samples | trained on photos, binarization merges digits |
+| Engine preference per nutrient (Tesseract for sugars) | −1 pt vs RapidOCR-first | |
 
 **Where errors come from** (per nutrient reading, dev): about 40% correct, 7–15% the label isn't found, 13–21% a wrong number is picked, and 23–39% the true value is never produced by the OCR. The last group (OCR misreading digits, decimal commas) is the main limit of Tesseract on these photos, and includes errors in the OFF values themselves: in a manual check of 12 disagreements, 3 were OFF errors and the photo was read correctly. That's why the ground truth is being corrected by hand.
 

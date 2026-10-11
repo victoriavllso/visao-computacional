@@ -6,7 +6,13 @@ import os
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from utils.constants import VENV_DIR, REQUIREMENTS_FILE, DEV_REQUIREMENTS_FILE, DATA_DIR
+from utils.constants import (
+    VENV_DIR,
+    REQUIREMENTS_FILE,
+    DEV_REQUIREMENTS_FILE,
+    NODEPS_REQUIREMENTS_FILE,
+    DATA_DIR,
+)
 from utils.logger import Logger
 
 log = Logger("setup")
@@ -69,8 +75,8 @@ def upgrade_pip(pip: Path) -> None:
     log.info("pip upgraded.")
 
 
-def install_requirements(pip: Path, requirements: Path) -> None:
-    """Install packages from requirements.txt."""
+def install_requirements(pip: Path, requirements: Path, no_deps: bool = False) -> None:
+    """Install packages from a requirements file."""
     req_path = requirements
 
     if not req_path.exists():
@@ -80,7 +86,10 @@ def install_requirements(pip: Path, requirements: Path) -> None:
     log.blank()
     log.info(f"Installing packages from {req_path} …")
     log.blank()
-    subprocess.check_call([str(pip), "install", "-r", str(req_path)])
+    command = [str(pip), "install", "-r", str(req_path)]
+    if no_deps:
+        command.append("--no-deps")
+    subprocess.check_call(command)
     log.blank()
     log.info("All packages installed successfully.")
 
@@ -151,6 +160,7 @@ def main() -> None:
         install_pre_commit_hooks()
     else:
         install_requirements(pip, REQUIREMENTS_FILE)
+    install_requirements(pip, NODEPS_REQUIREMENTS_FILE, no_deps=True)
 
     ensure_data_dir()
     print_activation_hint(venv_path)

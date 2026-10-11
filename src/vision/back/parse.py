@@ -105,6 +105,12 @@ def find_label(row, nutrient):
         token = normalize(re.sub(r"\(.*$", "", word.text))
         if len(token) < 3:
             continue
+        # Learned OCR returns whole phrases without spaces:
+        # 'Acucaresadicionados', 'Gordurassaturadas'.
+        if any(e in token for e in excluded):
+            continue
+        if any(len(key) >= 5 and key in token for key in keys):
+            return i
         score = max(similarity(token, key) for key in keys)
         if any(similarity(token, e) > score for e in excluded):
             continue
@@ -162,7 +168,11 @@ def value_near(words, label):
     ]
     if not candidates:
         return None
-    return parse_number(min(candidates, key=lambda w: w.x - label.right).text)
+    # Closest row first, then closest to the label.
+    best = min(
+        candidates, key=lambda w: (round(abs(w.cy - label.cy) / label.h, 1), w.x)
+    )
+    return parse_number(best.text)
 
 
 HEADER_SOLID = {"100g", "1009"}  # 'g' is often read as '9'
@@ -227,13 +237,50 @@ def value_in_column(words, label, headers):
     return parse_number(best.text)
 
 
+# RDC 429/2020 allows leaving out nutrients in non-significant amounts and
+# declaring them in a sentence: "Não contém quantidades significativas de
+# açúcares adicionados, gorduras saturadas e sódio". Those amounts count as
+# zero. Normalized text (no spaces or accents), as OCR often drops spaces.
+NOT_SIGNIFICANT = "significativ"
+NOT_SIGNIFICANT_SPAN = 120  # characters of the nutrient list after it
+NOT_SIGNIFICANT_KEYS = {
+    # 'açúcares' alone covers total and added sugars.
+    Nutrient.ADDED_SUGARS: ("adicionad", "acucar"),
+    # Saturated fat is part of total fat.
+    Nutrient.SATURATED_FAT: ("saturad", "gordurastotais"),
+    Nutrient.SODIUM: ("sodio",),
+}
+
+
+def row_text(row):
+    return normalize(" ".join(word.text for word in row))
+
+
+def not_significant(rows):
+    """Nutrients declared as 'não contém quantidades significativas'."""
+    text = "".join(row_text(row) for row in rows)
+    found = set()
+    start = text.find(NOT_SIGNIFICANT)
+    while start >= 0:
+        listed = text[start : start + NOT_SIGNIFICANT_SPAN]
+        # The list ends at the next sentence, e.g. '*Percentual de valores'.
+        listed = listed.split("percentual")[0]
+        for nutrient, keys in NOT_SIGNIFICANT_KEYS.items():
+            if any(key in listed for key in keys):
+                found.add(nutrient)
+        start = text.find(NOT_SIGNIFICANT, start + 1)
+    return found
+
+
 def parse_table(words) -> Reading:
     rows = group_rows(words)
     headers = find_headers(rows)
     values, matches, labels, spans = {}, {}, set(), {}
+    # The sentence mentions the labels; it isn't a table row.
+    table_rows = [row for row in rows if NOT_SIGNIFICANT not in row_text(row)]
 
     for nutrient in Nutrient:
-        for row in rows:
+        for row in table_rows:
             index = find_label(row, nutrient)
             if index is None:
                 continue
@@ -241,15 +288,25 @@ def parse_table(words) -> Reading:
             if nutrient not in spans:
                 spans[nutrient] = value_span(row, index)
 
-            value = value_in_column(words, row[index], headers)
+            # Same row first; other words only when the row has no value
+            # (curved tables push values out of their row).
+            label = row[index]
+            value = value_in_column(row[index + 1 :], label, headers)
             if value is None:
                 value = value_after(row, index)
             if value is None:
-                value = value_near(words, row[index])
+                value = value_in_column(words, label, headers)
+            if value is None:
+                value = value_near(words, label)
             if value is not None:
                 values[nutrient] = value
                 matches[nutrient] = (" ".join(w.text for w in row), value)
                 break
+
+    for nutrient in not_significant(rows):
+        if nutrient not in values:
+            values[nutrient] = 0.0
+            matches[nutrient] = ("não contém quantidades significativas", 0.0)
 
     facts = NutritionFacts(
         basis=headers[0].basis if headers else None,

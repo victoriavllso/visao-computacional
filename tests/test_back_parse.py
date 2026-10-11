@@ -252,3 +252,84 @@ def test_linear_format():
         4.7,
         113,
     )
+
+
+def test_labels_inside_phrases_without_spaces():
+    words = [
+        *row(0, (0, "Acucaresadicionados (g)"), (300, "29")),
+        *row(40, (0, "Gordurasmonoinsaturadas (g)"), (300, "2,1")),
+        *row(80, (0, "Gordurassaturadas (g)"), (300, "1,5")),
+        *row(120, (0, "Sodio (mg)"), (300, "367")),
+    ]
+    facts = parse_table(words).facts
+
+    assert (facts.added_sugars_g, facts.saturated_fat_g, facts.sodium_mg) == (
+        29,
+        1.5,
+        367,
+    )
+
+
+def test_tall_boxes_do_not_take_the_value_of_the_row_above():
+    # Learned OCR boxes are about as tall as the row spacing.
+    def line(y, text, *values):
+        return [Word(text, 0, y, 300, 70)] + [
+            Word(v, x, y + 5, 40, 60) for x, v in zip((660, 860), values)
+        ]
+
+    words = [
+        Word("100g", 650, 170, 60, 57),
+        *line(620, "Gorduras totais (g)", "24", "8,3"),
+        *line(690, "Gorduras saturadas (g)", "4,1", "1,4"),
+    ]
+
+    assert parse_table(words).facts.saturated_fat_g == 4.1
+
+
+def sentence(y, text):
+    return row(y, *[(60 * i, t) for i, t in enumerate(text.split())])
+
+
+def test_not_significant_amounts_count_as_zero():
+    words = [
+        *row(0, (300, "100"), (340, "g")),
+        *row(40, (0, "Sódio"), (60, "(mg)"), (300, "120")),
+        *sentence(80, "Não contém quantidades significativas de açúcares"),
+        *sentence(110, "adicionados, gorduras saturadas e sódio."),
+    ]
+    facts = parse_table(words).facts
+
+    assert facts.added_sugars_g == 0
+    assert facts.saturated_fat_g == 0
+    # A value read from the table wins over the sentence.
+    assert facts.sodium_mg == 120
+
+
+def test_not_significant_without_spaces_and_general_terms():
+    # Learned OCR drops spaces; 'açúcares' and 'gorduras totais' cover added
+    # sugars and saturated fat.
+    words = [
+        Word(
+            "Naocontemquantidadessignificativasdeacucares,gordurastotais.",
+            0,
+            0,
+            600,
+            30,
+        )
+    ]
+    facts = parse_table(words).facts
+
+    assert (facts.added_sugars_g, facts.saturated_fat_g, facts.sodium_mg) == (
+        0,
+        0,
+        None,
+    )
+
+
+def test_not_significant_list_stops_at_the_next_sentence():
+    words = [
+        *sentence(0, "Não contém quantidades significativas de gorduras trans."),
+        *sentence(30, "*Percentual de valores diários fornecidos pela porção. Sódio"),
+    ]
+
+    assert parse_table(words).facts.sodium_mg is None

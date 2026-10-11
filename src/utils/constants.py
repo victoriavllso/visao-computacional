@@ -4,6 +4,7 @@ PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 VENV_DIR: Path = PROJECT_ROOT / ".venv"
 REQUIREMENTS_FILE: Path = PROJECT_ROOT / "requirements.txt"
 DEV_REQUIREMENTS_FILE: Path = PROJECT_ROOT / "requirements-dev.txt"
+NODEPS_REQUIREMENTS_FILE: Path = PROJECT_ROOT / "requirements-nodeps.txt"
 DATA_DIR: Path = PROJECT_ROOT / "data"
 DATASET_DIR: Path = DATA_DIR / "product-database"
 

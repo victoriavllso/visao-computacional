@@ -22,8 +22,10 @@ from dataclasses import replace
 from types import SimpleNamespace
 from pathlib import Path
 
-# One Tesseract thread per process; parallelism comes from the pool.
+# One OCR thread per process (Tesseract, ONNX Runtime); parallelism comes
+# from the pool.
 os.environ.setdefault("OMP_THREAD_LIMIT", "1")
+os.environ.setdefault("ORT_THREADS", "1")
 
 sys.path.append(str(Path(__file__).parent.parent))
 

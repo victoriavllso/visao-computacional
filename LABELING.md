@@ -51,6 +51,7 @@ Para cada produto:
 3. Digite **açúcares adicionados (g)**, **gorduras saturadas (g)** e **sódio (mg)** dessa coluna. Vírgula ou ponto, tanto faz (`8,7`).
    - O valor do OFF aparece embaixo de cada campo; se estiver certo, clique **= OFF**.
    - Linha que não existe na tabela, ou que você não consegue ler: deixe **vazio** (não chute).
+   - Exceção: se a tabela diz *"Não contém quantidades significativas de ..."*, os nutrientes listados valem **0** (*açúcares* inclui os adicionados; *gorduras totais* inclui as saturadas).
 4. Escolha a situação da foto:
 
 | Situação | Quando | Valores |
