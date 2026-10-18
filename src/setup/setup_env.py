@@ -94,11 +94,17 @@ def install_requirements(pip: Path, requirements: Path, no_deps: bool = False) -
     log.info("All packages installed successfully.")
 
 
-def install_pre_commit_hooks() -> None:
+def install_pre_commit_hooks(venv_path: Path) -> None:
     """Install pre-commit hooks into the local .git directory."""
     log.blank()
     log.info("Installing pre-commit hooks...")
-    subprocess.check_call(["pre-commit", "install"])
+
+    pre_commit_path = venv_path / "bin" / "pre-commit"
+    if not pre_commit_path.exists():
+        log.error(f"pre-commit not found at {pre_commit_path} — aborting.")
+        sys.exit(1)
+
+    subprocess.check_call([str(pre_commit_path), "install"])
     log.info("pre-commit hooks installed.")
 
 
@@ -157,7 +163,7 @@ def main() -> None:
 
     if args.dev:
         install_requirements(pip, DEV_REQUIREMENTS_FILE)
-        install_pre_commit_hooks()
+        install_pre_commit_hooks(venv_path)
     else:
         install_requirements(pip, REQUIREMENTS_FILE)
     install_requirements(pip, NODEPS_REQUIREMENTS_FILE, no_deps=True)
