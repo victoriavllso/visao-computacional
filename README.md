@@ -134,7 +134,12 @@ Filters `food.parquet` to products whose `countries_tags` field ends with `:braz
 
 **`src/preprocessing/filter_images.py`**
 
-Keeps products that have both a `front_pt` and a `nutrition_pt` selected photo (Open Food Facts has no "back" key; the back of the package is the nutrition photo), and whose raw photos were both uploaded on or after `REGULATION_CUTOFF` (2023-10-09, end of the RDC 429/2020 transition for products already on the market).
+Keeps products that have both a `front_pt` and a `nutrition_pt` selected photo (Open Food Facts has no "back" key; the back of the package is the nutrition photo), and whose raw photos were both uploaded:
+
+- on or after `REGULATION_CUTOFF` (2023-10-09, end of the RDC 429/2020 transition for products already on the market), and
+- before `IMAGE_END_CUTOFF` (2026-10-18).
+
+The upper bound freezes the set of images at a fixed calendar date. That keeps the dataset reproducible (re-running the filter later yields the same pairs) and gives a stable pool of photos for the manual labeling of the back of the package, so labels do not drift as new images keep arriving on Open Food Facts.
 
 Output: `data/brazil_pairs/products_pairs.parquet`, one row per product with:
 - `front_*` / `nutrition_*`: image id, revision and upload time of each photo;

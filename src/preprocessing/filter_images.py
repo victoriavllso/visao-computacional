@@ -11,6 +11,7 @@ from utils.constants import (
     FRONT_IMAGE_KEY,
     NUTRITION_IMAGE_KEY,
     REGULATION_CUTOFF,
+    IMAGE_END_CUTOFF,
     GROUND_TRUTH_NUTRIENTS,
     VAL_FRACTION,
 )
@@ -81,7 +82,7 @@ def get_split(code, has_ground_truth):
     return "val" if bucket < VAL_FRACTION else "dev"
 
 
-def build_pair(product, cutoff_t):
+def build_pair(product, cutoff_t, end_cutoff_t):
     front = get_selected_image(product["images"], FRONT_IMAGE_KEY)
     nutrition = get_selected_image(product["images"], NUTRITION_IMAGE_KEY)
 
@@ -89,6 +90,9 @@ def build_pair(product, cutoff_t):
         return None
 
     if min(front["uploaded_t"], nutrition["uploaded_t"]) < cutoff_t:
+        return None
+
+    if max(front["uploaded_t"], nutrition["uploaded_t"]) >= end_cutoff_t:
         return None
 
     truth = get_ground_truth(product["nutriments"])
@@ -124,8 +128,18 @@ def filter_pairs():
         .timestamp()
     )
 
+    end_cutoff_t = (
+        datetime.fromisoformat(IMAGE_END_CUTOFF)
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    )
+
     products = pq.read_table(FILTER_BRAZIL_OUTPUT_FILE, columns=COLUMNS).to_pylist()
-    pairs = [pair for product in products if (pair := build_pair(product, cutoff_t))]
+    pairs = [
+        pair
+        for product in products
+        if (pair := build_pair(product, cutoff_t, end_cutoff_t))
+    ]
 
     FILTER_PAIRS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     pq.write_table(pa.Table.from_pylist(pairs), FILTER_PAIRS_OUTPUT_FILE)

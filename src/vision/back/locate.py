@@ -138,7 +138,8 @@ def skew_angle(h_lines):
         return 0.0
 
     angles = [
-        np.degrees(np.arctan2(y2 - y1, x2 - x1)) for x1, y1, x2, y2 in lines[:, 0]
+        np.degrees(np.arctan2(y2 - y1, x2 - x1))
+        for x1, y1, x2, y2 in lines.reshape(-1, 4)
     ]
     angles = [a for a in angles if abs(a) < 20]
     return float(np.median(angles)) if angles else 0.0

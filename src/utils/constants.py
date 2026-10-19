@@ -35,6 +35,10 @@ NUTRITION_IMAGE_KEY = "nutrition_pt"
 # (RDC 429/2020). Both photos must have been uploaded on or after this date.
 REGULATION_CUTOFF = "2023-10-09"
 
+# Strict upper bound on image capture time. Both photos must have been uploaded
+# before this date.
+IMAGE_END_CUTOFF = "2026-10-18"
+
 # Ground-truth nutrients (per 100 g/ml) needed to evaluate the back pipeline.
 GROUND_TRUTH_NUTRIENTS = ("added-sugars", "saturated-fat", "sodium")
 
