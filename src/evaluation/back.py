@@ -41,6 +41,7 @@ from vision.back.pipeline import read_back
 log = Logger("eval back")
 
 EVAL_DIR = DATA_DIR / "evaluation"
+DEBUG_DIR = DATA_DIR / "debug"
 
 # A reading matches OFF within 5% or this absolute amount (g, g, mg).
 TOLERANCE = {
@@ -55,8 +56,9 @@ def matches(read, truth, nutrient):
 
 
 def evaluate_product(args):
-    product, labels, locate, preprocess = args
+    product, labels, locate, preprocess, debug = args
     product = SimpleNamespace(**product)
+    debug_dir = str(EVAL_DIR.parent / "debug" / str(product.code)) if debug else None
     path = IMAGES_OUTPUT_DIR / "nutrition" / f"{product.code}.jpg"
     truth, source = truth_facts(product, labels)
     label = labels.get(str(product.code))
@@ -68,7 +70,9 @@ def evaluate_product(args):
     }
 
     try:
-        result = read_back(str(path), locate=locate, preprocess=preprocess)
+        result = read_back(
+            str(path), locate=locate, preprocess=preprocess, debug_dir=debug_dir
+        )
     except Exception as error:
         row["error"] = repr(error)
         return row
@@ -90,6 +94,20 @@ def evaluate_product(args):
         row[f"{name}_label"] = nutrient in result.reading.labels
 
     if truth is None:
+        if debug_dir is not None:
+            from vision.back.debug import update_summary_evaluation
+
+            update_summary_evaluation(
+                debug_dir=debug_dir,
+                result=result,
+                truth=None,
+                source=source,
+                true_type=true_type,
+                read_assessment=None,
+                true_assessment=None,
+                matches_func=matches,
+                tolerance_dict=TOLERANCE,
+            )
         return row
 
     # Hand labels give the basis; OFF's comes from the package quantity, so
@@ -116,6 +134,21 @@ def evaluate_product(args):
                 and (nutrient in read_assessment.required)
                 == (nutrient in true_assessment.required)
             )
+
+    if debug_dir is not None:
+        from vision.back.debug import update_summary_evaluation
+
+        update_summary_evaluation(
+            debug_dir=debug_dir,
+            result=result,
+            truth=truth,
+            source=source,
+            true_type=true_type,
+            read_assessment=read_assessment,
+            true_assessment=true_assessment,
+            matches_func=matches,
+            tolerance_dict=TOLERANCE,
+        )
 
     return row
 
@@ -190,6 +223,11 @@ def parse_args():
     parser.add_argument("--no-locate", action="store_true")
     parser.add_argument("--no-preprocess", action="store_true")
     parser.add_argument("--workers", type=int, default=os.cpu_count())
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="save intermediate CV/OCR images to data/debug/<code>/",
+    )
     return parser.parse_args()
 
 
@@ -204,11 +242,19 @@ def main():
         products = products.sample(min(args.limit, len(products)), random_state=0)
 
     locate, preprocess = not args.no_locate, not args.no_preprocess
-    tasks = [(p, labels, locate, preprocess) for p in products.to_dict("records")]
+    tasks = [
+        (p, labels, locate, preprocess, args.debug) for p in products.to_dict("records")
+    ]
 
     start = time.perf_counter()
-    with ProcessPoolExecutor(args.workers) as pool:
-        results = pd.DataFrame(pool.map(evaluate_product, tasks, chunksize=4))
+    if args.debug:
+        # Sequential: clearer console output and avoids cross-process I/O
+        # races writing debug images.
+        log.info(f"Debug mode: processing {len(tasks)} products sequentially")
+        results = pd.DataFrame([evaluate_product(t) for t in tasks])
+    else:
+        with ProcessPoolExecutor(args.workers) as pool:
+            results = pd.DataFrame(pool.map(evaluate_product, tasks, chunksize=4))
     log.info(f"Done in {time.perf_counter() - start:.0f} s")
 
     EVAL_DIR.mkdir(parents=True, exist_ok=True)

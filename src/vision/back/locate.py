@@ -221,15 +221,22 @@ def count_ruled_rows(h_lines, box):
     return int(np.count_nonzero(stats[1:, cv2.CC_STAT_WIDTH] >= RULED_ROW_SPAN * w))
 
 
-def locate_table(image) -> Table:
+def locate_table(image, debug_dir=None) -> Table:
     """Crop and straighten the nutrition table. Falls back to the whole
     image when no ruled table is found (e.g. tables without lines)."""
     scale = min(1.0, WORK_SIZE / max(image.shape[:2]))
     small = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
 
-    bw = binarize(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY))
+    gray_small = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    bw = binarize(gray_small)
     text_height = estimate_text_height(bw)
     h_lines, v_lines = line_masks(bw, text_height)
+
+    if debug_dir is not None:
+        from vision.back.debug import save_line_masks
+
+        save_line_masks(debug_dir, gray_small, h_lines, v_lines)
+
     box, _ = find_table_box(h_lines, v_lines, text_height)
     if box is not None and (
         box[2] < MIN_BOX_SIDE * bw.shape[1] or box[3] < MIN_BOX_SIDE * bw.shape[0]
@@ -256,7 +263,17 @@ def locate_table(image) -> Table:
 
     crop = rotate(crop, angle) if abs(angle) > 0.2 else crop
     if DEWARP:
+        pre_dewarp = crop
         crop = dewarp(crop)
+        if debug_dir is not None:
+            from vision.back.debug import save_located_crop, save_dewarped
+
+            save_located_crop(debug_dir, pre_dewarp, box, angle, inverted)
+            save_dewarped(debug_dir, crop)
+    elif debug_dir is not None:
+        from vision.back.debug import save_located_crop
+
+        save_located_crop(debug_dir, crop, box, angle, inverted)
 
     return Table(
         image=crop,

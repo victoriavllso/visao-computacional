@@ -64,33 +64,58 @@ class BackResult:
         return self.photo_type.readable
 
 
-def read_back(image, locate=True, preprocess=True) -> BackResult:
+def read_back(image, locate=True, preprocess=True, debug_dir=None) -> BackResult:
     """`locate` and `preprocess` switch the classical steps off, to measure
-    what each one adds."""
+    what each one adds.  `debug_dir`, when set, saves intermediate images and
+    a JSON summary to that directory."""
     if isinstance(image, str):
         path, image = image, cv2.imread(image)
         if image is None:
             raise FileNotFoundError(path)
 
-    table = locate_table(image) if locate else None
+    if debug_dir is not None:
+        from pathlib import Path
+
+        debug_dir = Path(debug_dir)
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        from vision.back.debug import save_original
+
+        save_original(debug_dir, image)
+
+    table = locate_table(image, debug_dir=debug_dir) if locate else None
     crop = table.image if table is not None else image
 
     # Stage 1, before OCR: only photos with almost no text are rejected.
     if table is not None and table.text_blobs < MIN_TEXT_BLOBS:
         empty = parse_table([])
         photo_features = features(table, [], empty)
-        return BackResult(empty, table, PhotoType.NO_TABLE, photo_features)
+        result = BackResult(empty, table, PhotoType.NO_TABLE, photo_features)
+        if debug_dir is not None:
+            from vision.back.debug import save_summary
+
+            save_summary(debug_dir, result)
+        return result
 
     # Stage 2, after the fast OCR: the format is in the text.
     if ENGINE == "rapidocr":
         words = read_words_rapidocr(crop)
         reading = parse_table(words)
+        if debug_dir is not None:
+            from vision.back.debug import save_ocr_rapidocr
+
+            save_ocr_rapidocr(debug_dir, crop, words)
     else:
         clean = prepare(crop) if preprocess else crop
         words = read_words(clean, preprocess=False)
         reading = parse_table(words)
         if REFINE and preprocess:
             reading = refine(clean, reading)
+
+        if debug_dir is not None:
+            from vision.back.debug import save_binarized, save_ocr_tesseract
+
+            save_binarized(debug_dir, clean)
+            save_ocr_tesseract(debug_dir, clean, words)
 
     photo_features = features(table, words, reading)
     photo_type = classify(photo_features)
@@ -105,11 +130,24 @@ def read_back(image, locate=True, preprocess=True) -> BackResult:
         photo_features = features(table, words + learned, reading)
         photo_type = classify(photo_features)
 
+        if debug_dir is not None:
+            from vision.back.debug import save_ocr_rapidocr
+
+            save_ocr_rapidocr(debug_dir, crop, learned)
+
     if photo_type is PhotoType.UNCERTAIN:
         # Still no format evidence with all the text read.
         photo_type = UNCERTAIN_AS
 
-    return BackResult(reading, table, photo_type, photo_features)
+    result = BackResult(reading, table, photo_type, photo_features)
+
+    if debug_dir is not None:
+        from vision.back.debug import save_parsed_values, save_summary
+
+        save_parsed_values(debug_dir, crop, reading)
+        save_summary(debug_dir, result)
+
+    return result
 
 
 def combine(primary, fallback):

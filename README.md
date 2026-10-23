@@ -215,8 +215,24 @@ photo ─► locate ─► almost no text? ────────────�
 **Evaluation** against the ground truth (hand labels where they exist, see [LABELING.md](LABELING.md); Open Food Facts values otherwise):
 
 ```bash
-python src/evaluation/back.py --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name]
+python src/evaluation/back.py --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug]
 ```
+
+Use `--debug` to save intermediate images and a JSON summary for every product to `data/debug/<code>/`. The output per product is:
+
+| File | Contents |
+| :--- | :--- |
+| `01_original.jpg` | Original input image |
+| `02_located_crop.jpg` | Crop after table location (before dewarp) |
+| `03_line_masks.jpg` | Horizontal (red) + vertical (blue) line masks |
+| `04_binarized.jpg` | Binarized image fed to Tesseract |
+| `05_dewarped_crop.jpg` | Crop after deskew + dewarp |
+| `06_ocr_tesseract.jpg` | Tesseract word bounding boxes |
+| `07_ocr_rapidocr.jpg` | RapidOCR word bounding boxes |
+| `08_parsed_values.jpg` | Nutrient labels + read values annotated (flagged high in red) |
+| `summary.json` | Classification, features, parsed values, ANVISA warning flags, and evaluation comparison context |
+
+Debug mode runs sequentially (no multiprocessing) for cleaner output. Combine with `--limit` to debug a few products quickly:
 
 Each metric counts only products whose true value or decision is known. Per nutrient: *label* (row found), *found* (value read), *correct* (within 5%), *decision* (same warning decision as the truth). Photos classified as not readable get no values (the pipeline abstains). The report has the photo type confusion matrix against the hand labels and the metrics on three subsets: all photos end-to-end, predicted readable, and **hand-labeled readable** (the unmasked score).
 
