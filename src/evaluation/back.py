@@ -19,8 +19,9 @@ import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
-from types import SimpleNamespace
+from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 # One OCR thread per process (Tesseract, ONNX Runtime); parallelism comes
 # from the pool.
@@ -31,8 +32,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import pandas as pd
 
-from rules.anvisa import Nutrient, NutritionFacts, assess
 from labeling.labels import load_labels, truth_facts
+from rules.anvisa import Nutrient, NutritionFacts, assess
 from utils.constants import DATA_DIR, FILTER_PAIRS_OUTPUT_FILE, IMAGES_OUTPUT_DIR
 from utils.logger import Logger
 from vision.back.classify import STATUS_TYPES, PhotoType
@@ -67,6 +68,8 @@ def evaluate_product(args):
         "code": product.code,
         "truth": source,
         "true_type": None if true_type is None else true_type.value,
+        "photo_type": None,
+        "error": None,
     }
 
     try:
@@ -89,6 +92,10 @@ def evaluate_product(args):
         else NutritionFacts(None, None, None, None)
     )
     row["basis_read"] = None if read.basis is None else read.basis.value
+    row["basis_true"] = (
+        None if truth is None or truth.basis is None else truth.basis.value
+    )
+
     for nutrient in Nutrient:
         name = nutrient.value
         row[f"{name}_read"] = read.amount(nutrient)
@@ -154,6 +161,368 @@ def evaluate_product(args):
     return row
 
 
+def _metric_row(results, nutrient):
+    """Return a dict with the four metrics for one nutrient (None = n/a)."""
+    name = nutrient.value
+    cols = [
+        f"{name}_label",
+        f"{name}_found",
+        f"{name}_correct",
+        f"{name}_decision_correct",
+    ]
+    row = {}
+    for col in cols:
+        values = results[col].dropna() if col in results else pd.Series(dtype=bool)
+        row[col] = values.astype(bool).mean() if len(values) else float("nan")
+    return row
+
+
+def _metric_block_md(results, title):
+    """Return a Markdown string for one metric subset."""
+    lines = [f"### {title} ({len(results)} products)", ""]
+    lines.append(
+        f"| {'Nutrient':<15} | {'Label':>7} | {'Found':>7} | {'Correct':>8} | {'Decision':>9} |"
+    )
+    lines.append(f"| {'-'*15} | {'-'*7} | {'-'*7} | {'-'*8} | {'-'*9} |")
+    for nutrient in Nutrient:
+        row = _metric_row(results, nutrient)
+        name = nutrient.value
+
+        def fmt(v):
+            return f"{v:.1%}" if v == v else "n/a"  # NaN check
+
+        lines.append(
+            f"| {name:<15} | {fmt(row[f'{name}_label']):>7} | {fmt(row[f'{name}_found']):>7}"
+            f" | {fmt(row[f'{name}_correct']):>8} | {fmt(row[f'{name}_decision_correct']):>9} |"
+        )
+
+    columns = [f"{n.value}_decision_correct" for n in Nutrient]
+    if set(columns) <= set(results.columns):
+        complete = results[columns].dropna()
+        if len(complete):
+            all_correct = complete.astype(bool).all(axis=1).mean()
+            lines.append("")
+            lines.append(
+                f"**All three decisions correct:** {all_correct:.1%}"
+                f" (of {len(complete)} products with all three decisions known)"
+            )
+
+    return "\n".join(lines)
+
+
+def _format_confusion_matrix(typed: pd.DataFrame) -> list[str]:
+    """Generate markdown tables for raw confusion matrix, normalized recall, and per-class metrics."""
+    lines = []
+
+    # Get all unique labels across true and predicted to ensure square matrix
+    all_labels = sorted(
+        list(
+            set(typed["true_type"].dropna().unique())
+            | set(typed["photo_type"].dropna().unique())
+        )
+    )
+
+    # Build raw crosstab with complete index/columns
+    cm_raw = pd.crosstab(typed["true_type"], typed["photo_type"], dropna=False).reindex(
+        index=all_labels, columns=all_labels, fill_value=0
+    )
+
+    # 1. Raw Confusion Matrix Table
+    lines.append("### Confusion Matrix (Raw Counts)")
+    lines.append("")
+    header = (
+        "| True \\ Pred | "
+        + " | ".join([str(c) for c in cm_raw.columns])
+        + " | Total |"
+    )
+    sep = "| " + " | ".join(["---"] * (len(cm_raw.columns) + 2)) + " |"
+    lines.extend([header, sep])
+
+    for idx, row in cm_raw.iterrows():
+        total = row.sum()
+        row_str = " | ".join([f"{v:,}" for v in row])
+        lines.append(f"| **{idx}** | {row_str} | **{total:,}** |")
+
+    # Column totals
+    col_totals = cm_raw.sum(axis=0)
+    total_all = col_totals.sum()
+    col_str = " | ".join([f"**{v:,}**" for v in col_totals])
+    lines.append(f"| **Total** | {col_str} | **{total_all:,}** |")
+    lines.append("")
+
+    # 2. Per-Class Precision, Recall, and F1-Score
+    lines.append("### Per-Class Classification Metrics")
+    lines.append("")
+    lines.append("| Photo Type | Support | Precision | Recall | F1-Score |")
+    lines.append("| :--- | :---: | :---: | :---: | :---: |")
+
+    for label in all_labels:
+        tp = (
+            cm_raw.loc[label, label]
+            if label in cm_raw.index and label in cm_raw.columns
+            else 0
+        )
+        fn = cm_raw.loc[label].sum() - tp
+        fp = cm_raw[label].sum() - tp
+        support = tp + fn
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = (
+            (2 * precision * recall / (precision + recall))
+            if (precision + recall) > 0
+            else 0.0
+        )
+
+        lines.append(
+            f"| **{label}** | {support:,} | {precision:.1%} | {recall:.1%} | {f1:.1%} |"
+        )
+
+    lines.append("")
+    return lines
+
+
+def _format_basis_metrics(results: pd.DataFrame) -> list[str]:
+    """Evaluate serving basis extraction accuracy and compare ground truth vs predicted basis."""
+    if "basis_read" not in results.columns or "basis_true" not in results.columns:
+        return []
+
+    evaluated = results.dropna(subset=["basis_read", "basis_true"])
+    if len(evaluated) == 0:
+        return []
+
+    correct = (evaluated["basis_read"] == evaluated["basis_true"]).sum()
+    total = len(evaluated)
+    acc = correct / total if total > 0 else 0.0
+
+    all_bases = sorted(
+        list(
+            set(evaluated["basis_true"].unique())
+            | set(evaluated["basis_read"].unique())
+        )
+    )
+
+    cm_basis = pd.crosstab(
+        evaluated["basis_true"], evaluated["basis_read"], dropna=False
+    ).reindex(index=all_bases, columns=all_bases, fill_value=0)
+
+    lines = [
+        "## Serving Basis Extraction",
+        "",
+        f"**Evaluated photos with ground truth:** {total:,}  ",
+        f"**Basis Extraction Accuracy:** **{acc:.1%}** ({correct}/{total})  ",
+        f"**Ground Truth Basis distribution:** `{evaluated['basis_true'].value_counts().to_dict()}`  ",
+        f"**Predicted Basis distribution (Evaluated):** `{evaluated['basis_read'].value_counts().to_dict()}`  ",
+        f"**Total Predicted Basis distribution (All photos):** `{results['basis_read'].value_counts().to_dict()}`  ",
+        "",
+        "### Basis Confusion Matrix",
+        "",
+    ]
+
+    header = (
+        "| True \\ Pred | "
+        + " | ".join([str(c) for c in cm_basis.columns])
+        + " | Total |"
+    )
+    sep = "| " + " | ".join(["---"] * (len(cm_basis.columns) + 2)) + " |"
+    lines.extend([header, sep])
+
+    for idx, row in cm_basis.iterrows():
+        total_row = row.sum()
+        row_str = " | ".join([f"{v:,}" for v in row])
+        lines.append(f"| **{idx}** | {row_str} | **{total_row:,}** |")
+
+    col_totals = cm_basis.sum(axis=0)
+    col_str = " | ".join([f"**{v:,}**" for v in col_totals])
+    lines.append(f"| **Total** | {col_str} | **{col_totals.sum():,}** |")
+    lines.append("")
+
+    return lines
+
+
+def _format_numerical_errors(results: pd.DataFrame) -> list[str]:
+    """Calculate MAE and error distributions for numerical OCR extractions."""
+    lines = ["## Numerical Extractions Error Analysis (MAE)", ""]
+    lines.append(
+        "| Nutrient | Evaluated Count | Mean Abs Error (MAE) | Median Abs Error |"
+    )
+    lines.append("| :--- | :---: | :---: | :---: |")
+
+    has_data = False
+    for nutrient in Nutrient:
+        name = nutrient.value
+        read_col, true_col = f"{name}_read", f"{name}_true"
+
+        if read_col in results.columns and true_col in results.columns:
+            valid = results.dropna(subset=[read_col, true_col]).copy()
+            if len(valid):
+                has_data = True
+                errors = (valid[read_col] - valid[true_col]).abs()
+                mae = errors.mean()
+                median_err = errors.median()
+                unit = "mg" if nutrient == Nutrient.SODIUM else "g"
+                lines.append(
+                    f"| **{name}** | {len(valid):,} | {mae:.2f} {unit} | {median_err:.2f} {unit} |"
+                )
+
+    if not has_data:
+        return []
+
+    lines.append("")
+    return lines
+
+
+def _format_top_outliers(results: pd.DataFrame, top_n: int = 5) -> list[str]:
+    """Identify and format products with the largest numerical OCR misreads."""
+    outliers = []
+    for nutrient in Nutrient:
+        name = nutrient.value
+        r_col, t_col = f"{name}_read", f"{name}_true"
+        if r_col in results.columns and t_col in results.columns:
+            valid = results.dropna(subset=[r_col, t_col]).copy()
+            if len(valid) == 0:
+                continue
+            valid["diff"] = (valid[r_col] - valid[t_col]).abs()
+            valid["nutrient"] = name
+            valid["read_val"] = valid[r_col]
+            valid["true_val"] = valid[t_col]
+            outliers.append(valid[["code", "nutrient", "read_val", "true_val", "diff"]])
+
+    if not outliers:
+        return []
+
+    df_outliers = (
+        pd.concat(outliers).sort_values(by="diff", ascending=False).head(top_n)
+    )
+    if len(df_outliers) == 0 or df_outliers["diff"].max() == 0:
+        return []
+
+    lines = [
+        f"### Top {top_n} Largest Numerical Discrepancies",
+        "",
+        "| Product Code | Nutrient | Read Value | True Value | Absolute Difference |",
+        "| :---: | :---: | :---: | :---: | :---: |",
+    ]
+    for _, row in df_outliers.iterrows():
+        unit = "mg" if row["nutrient"] == "sodium" else "g"
+        lines.append(
+            f"| `{row['code']}` | **{row['nutrient']}** | {row['read_val']:.1f} {unit} | {row['true_val']:.1f} {unit} | **{row['diff']:.1f} {unit}** |"
+        )
+    lines.append("")
+    return lines
+
+
+def write_markdown_report(
+    results: pd.DataFrame, output_csv: Path, args, elapsed_time: float = 0.0
+):
+    """Write a comprehensive Markdown summary of the evaluation run beside the CSV output."""
+    errors_df = (
+        results[results["error"].notna()] if "error" in results else pd.DataFrame()
+    )
+    total_products = len(results)
+    error_count = len(errors_df)
+    success_count = total_products - error_count
+
+    throughput = total_products / elapsed_time if elapsed_time > 0 else 0
+    avg_latency = (elapsed_time / total_products * 1000) if total_products > 0 else 0
+
+    lines = [
+        "# Back Evaluation Report",
+        "",
+        f"**Run Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ",
+        f"**Split:** `{args.split}` | **Locate:** `{not args.no_locate}` | **Preprocess:** `{not args.no_preprocess}`  ",
+        "",
+        "## Executive Summary",
+        "",
+        f"| Metric | Value |",
+        f"| :--- | :--- |",
+        f"| **Total Products Evaluated** | {total_products:,} |",
+        f"| **Successful Executions** | {success_count:,} ({success_count / total_products:.1%}) |",
+        f"| **Pipeline Errors / Failures** | {error_count:,} ({error_count / total_products:.1%}) |",
+        f"| **Total Execution Time** | {elapsed_time:.1f} s |",
+        f"| **Throughput** | {throughput:.1f} products/sec ({avg_latency:.0f} ms/product) |",
+        "",
+        "## Dataset Composition",
+        "",
+        f"**Ground truth sources:** `{results.truth.value_counts().to_dict()}`  ",
+        f"**Photo types detected:** `{results.photo_type.value_counts().to_dict() if 'photo_type' in results else 'N/A'}`  ",
+        "",
+    ]
+
+    # Photo type accuracy & confusion matrix
+    if "true_type" in results.columns and "photo_type" in results.columns:
+        typed = results.dropna(subset=["true_type", "photo_type"])
+        if len(typed):
+            accuracy = (typed["true_type"] == typed["photo_type"]).mean()
+            lines.extend(
+                [
+                    "## Photo Type Classification",
+                    "",
+                    f"**Hand-labeled products:** {len(typed):,}  ",
+                    f"**Overall Classification Accuracy:** **{accuracy:.1%}**  ",
+                    "",
+                ]
+            )
+            lines.extend(_format_confusion_matrix(typed))
+
+    # Basis accuracy
+    lines.extend(_format_basis_metrics(results))
+
+    # Numerical error analysis & top outliers
+    lines.extend(_format_numerical_errors(results))
+    lines.extend(_format_top_outliers(results, top_n=5))
+
+    # Accuracy Metrics Tables
+    lines.append("## Nutrient Extraction & Decision Metrics")
+    lines.append("")
+
+    readable_types = {PhotoType.TABLE.value, PhotoType.LINEAR.value}
+    subsets = {
+        "All photos, end-to-end (abstaining counts as wrong)": results,
+    }
+
+    if "photo_type" in results.columns:
+        subsets["Predicted readable"] = results[
+            results["photo_type"].isin(readable_types)
+        ]
+
+    if "true_type" in results.columns and "photo_type" in results.columns:
+        typed = results.dropna(subset=["true_type"])
+        if len(typed):
+            subsets["Hand-labeled readable (unmasked)"] = typed[
+                typed["true_type"].isin(readable_types)
+            ]
+
+    for title, subset in subsets.items():
+        if len(subset) > 0:
+            lines.append(_metric_block_md(subset, title))
+            lines.append("")
+
+    # Error & Exception Breakdown
+    if error_count > 0:
+        lines.extend(
+            [
+                "## Pipeline Failure & Error Log",
+                "",
+                f"Total runtime errors: **{error_count}**",
+                "",
+                "### Exception Summary",
+                "",
+                "| Error Count | Sample Error Message |",
+                "| :---: | :--- |",
+            ]
+        )
+        error_counts = errors_df["error"].value_counts()
+        for err_msg, count in error_counts.head(5).items():
+            short_msg = str(err_msg).replace("\n", " ")[:120]
+            lines.append(f"| {count} | `{short_msg}` |")
+        lines.append("")
+
+    md_path = output_csv.with_suffix(".md")
+    md_path.write_text("\n".join(lines), encoding="utf-8")
+    log.info(f"Markdown report saved: {md_path}")
+
+
 def rate(results, column):
     """Share of True among products where the metric applies."""
     values = results[column].dropna() if column in results else pd.Series(dtype=bool)
@@ -164,26 +533,36 @@ def summarize(results):
     errors = results["error"].notna().sum() if "error" in results else 0
     log.info(f"Products: {len(results)}   errors: {errors}")
     log.info(f"Ground truth: {results.truth.value_counts().to_dict()}")
-    log.info(f"Photo types: {results.photo_type.value_counts().to_dict()}")
 
-    typed = results[results.true_type.notna()]
-    if len(typed):
-        log.blank()
-        log.info(f"Photo type vs hand labels ({len(typed)} products), rows = true:")
-        print(pd.crosstab(typed.true_type, typed.photo_type, margins=True))
-        log.info(
-            f"Photo type accuracy: {(typed.true_type == typed.photo_type).mean():.1%}"
-        )
+    if "photo_type" in results and results["photo_type"].notna().any():
+        log.info(f"Photo types: {results['photo_type'].value_counts().to_dict()}")
+    else:
+        log.info("Photo types: N/A")
+
+    if "true_type" in results and "photo_type" in results:
+        typed = results.dropna(subset=["true_type", "photo_type"])
+        if len(typed):
+            log.blank()
+            log.info(f"Photo type vs hand labels ({len(typed)} products), rows = true:")
+            print(pd.crosstab(typed.true_type, typed.photo_type, margins=True))
+            log.info(
+                f"Photo type accuracy: {(typed.true_type == typed.photo_type).mean():.1%}"
+            )
 
     readable = {PhotoType.TABLE.value, PhotoType.LINEAR.value}
     subsets = {
         "All photos, end-to-end (abstaining counts as wrong)": results,
-        "Predicted readable": results[results.photo_type.isin(readable)],
     }
-    if len(typed):
-        subsets["Hand-labeled readable (unmasked)"] = typed[
-            typed.true_type.isin(readable)
-        ]
+    if "photo_type" in results:
+        subsets["Predicted readable"] = results[results.photo_type.isin(readable)]
+
+    if "true_type" in results and "photo_type" in results:
+        typed = results.dropna(subset=["true_type", "photo_type"])
+        if len(typed):
+            subsets["Hand-labeled readable (unmasked)"] = typed[
+                typed.true_type.isin(readable)
+            ]
+
     for title, subset in subsets.items():
         log.blank()
         log.info(f"{title}: {len(subset)} products")
@@ -256,16 +635,21 @@ def main():
     else:
         with ProcessPoolExecutor(args.workers) as pool:
             results = pd.DataFrame(pool.map(evaluate_product, tasks, chunksize=4))
-    log.info(f"Done in {time.perf_counter() - start:.0f} s")
+    elapsed = time.perf_counter() - start
+    log.info(f"Done in {elapsed:.0f} s")
 
-    EVAL_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     variant = (
         f"{'locate' if locate else 'nolocate'}_{'prep' if preprocess else 'noprep'}"
     )
-    output = EVAL_DIR / f"back_{args.split}_{args.tag or variant}.csv"
+    run_name = f"{timestamp}_{args.tag or variant}"
+    run_dir = EVAL_DIR / f"back_{args.split}_{run_name}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    output = run_dir / f"back_{args.split}_{run_name}.csv"
     results.to_csv(output, index=False)
 
     summarize(results)
+    write_markdown_report(results, output, args, elapsed_time=elapsed)
     log.info(f"Per-product results: {output}")
 
 
