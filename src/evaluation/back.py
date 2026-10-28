@@ -75,6 +75,7 @@ def evaluate_product(args):
         )
     except Exception as error:
         row["error"] = repr(error)
+        log.error(f"Error reading {product.code}: {error}")
         return row
 
     row["photo_type"] = result.photo_type.value

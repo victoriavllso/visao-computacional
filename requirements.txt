@@ -35,7 +35,7 @@ pytesseract==0.3.13
 pytest==8.4.2
 python-dateutil==2.9.0.post0
 PyYAML==6.0.3
-rapidocr-onnxruntime==1.2.3
+rapidocr==3.10.0
 requests==2.34.2
 scikit-learn==1.9.1
 scipy==1.18.1
