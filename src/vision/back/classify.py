@@ -62,15 +62,20 @@ NUTRITION_WORDS = (
     "fibra",
     "sodio",
 )
-PER_100 = ("por100g", "por100ml")
-NEW_FORMAT_TEXT = ("acucarestotais", "fornecidospelaporcao")
+
+# Text patterns indicating a 100g/100ml basis for RDC 429/2020
+PER_100 = ("por100g", "por100ml", "100g", "100ml", "100gpor", "100mlpor")
+
+# Distinct phrases used in linear/text declarations (e.g. "por 100 g contém...")
+PER_100_EXPLICIT_LINEAR = ("por100g", "por100ml", "em100g", "em100ml", "100gcontem", "100mlcontem")
+
+NEW_FORMAT_TEXT = ("acucarestotais", "fornecidospelaporcao", "adicionados")
 OLD_FORMAT_TEXT = ("quantidadeporporcao", "dietade2000", "8400kj")
 
 # Thresholds, to tune on dev hand labels.
 MIN_NUTRITION_WORDS = 3
-MIN_RULED_ROWS = 3
 # Nutrition words needed for a '100 g' header to count.
-MIN_HEADER_CONTEXT = 2
+MIN_HEADER_CONTEXT = 1
 
 
 @dataclass(frozen=True)
@@ -80,6 +85,7 @@ class Features:
     has_100_header: bool
     has_added_sugars: bool
     has_per_100_text: bool
+    has_explicit_linear: bool
     has_new_format_text: bool
     has_old_format_text: bool
 
@@ -103,22 +109,27 @@ def features(table, words, reading) -> Features:
         has_100_header=bool(reading.headers),
         has_added_sugars=Nutrient.ADDED_SUGARS in reading.labels,
         has_per_100_text=any(phrase in text for phrase in PER_100),
+        has_explicit_linear=any(phrase in text for phrase in PER_100_EXPLICIT_LINEAR),
         has_new_format_text=any(phrase in text for phrase in NEW_FORMAT_TEXT),
         has_old_format_text=any(phrase in text for phrase in OLD_FORMAT_TEXT),
     )
 
 
 def classify(f: Features) -> PhotoType:
-    # A 100 g header or an added sugars row is a nutrition table, however
-    # little else the OCR read.
+    # If no nutrition context and no new format evidence -> NO_TABLE
     if f.nutrition_words < MIN_NUTRITION_WORDS and not f.new_format_evidence:
         return PhotoType.NO_TABLE
-    # No 100 g/100 ml column means old format, even for transitional labels
-    # that already have an "açúcares adicionados" row: per portion only.
-    if f.has_old_format_text and not (f.has_100_header or f.has_per_100_text):
+
+    # Priority 1: New format evidence (RDC 429/2020)
+    if f.new_format_evidence:
+        # Only declare as LINEAR if there is an explicit continuous linear text pattern AND no ruled lines detected
+        if f.has_explicit_linear and f.ruled_rows == 0:
+            return PhotoType.LINEAR
+        return PhotoType.TABLE
+
+    # Priority 2: Clear evidence of old format without any new format hints
+    if f.has_old_format_text:
         return PhotoType.OLD_FORMAT
-    if not f.new_format_evidence:
-        return PhotoType.OLD_FORMAT if f.has_old_format_text else PhotoType.UNCERTAIN
-    if f.has_per_100_text and f.ruled_rows < MIN_RULED_ROWS:
-        return PhotoType.LINEAR
-    return PhotoType.TABLE
+
+    # Priority 3: Has nutrition words but format is ambiguous -> UNCERTAIN (trigger RapidOCR)
+    return PhotoType.UNCERTAIN
