@@ -24,15 +24,17 @@ make pipeline
 
 `make download` baixa ~8 GB e `make pipeline` baixa ~5 GB de imagens. Se alguém do grupo já tem a pasta `data/`, copiar dela é mais rápido.
 
+Todos precisam usar o mesmo snapshot do OFF (fixado em `HF_REVISION`, 2026-10-18), senão a lista de produtos muda. Se você baixou o dataset antes desta versão, veja "Downloading the Dataset" no README.
+
 ## 2. Abrir a ferramenta
 
 ```bash
 git pull
 source .venv/bin/activate
-python src/labeling/server.py --labeler seu-nome
+make label
 ```
 
-Abra <http://localhost:8765> no navegador. Os rótulos vão para `labels/back/<labeler>.jsonl` (sem `--labeler`: `labels/back/hand-labeled.jsonl`, que já tem os rótulos feitos até agora). Se mais de uma pessoa estiver rotulando, cada uma usa o **seu** `--labeler` (sem espaços), sempre o mesmo: um arquivo por pessoa, assim o `git pull` nunca dá conflito.
+Abra <http://localhost:8765> no navegador. Os rótulos de todos vão para um único arquivo, `labels/back/hand-labeled.jsonl`. Cada salvamento acrescenta uma linha; o `git pull` junta as linhas de todos sem conflito (`merge=union` no `.gitattributes`).
 
 ## 3. Rotular
 
@@ -79,8 +81,10 @@ git commit -m "labels: +N produtos"
 git push
 ```
 
+De vez em quando, para tirar as linhas repetidas (produto salvo mais de uma vez), rode `make compact-labels`: reescreve o arquivo com um rótulo por produto (o mais recente) e junta nele outros arquivos `.jsonl` que existirem na pasta.
+
 ## Como os rótulos são usados
 
-- `src/labeling/labels.py`: junta os arquivos de todos e decide o gabarito de cada produto (manual se existir, OFF se não).
+- `src/labeling/labels.py`: lê os rótulos (linhas corrompidas são ignoradas com um aviso) e decide o gabarito de cada produto (manual se existir, OFF se não).
 - `python src/evaluation/back.py --split dev`: avaliação do pipeline do verso; `--hand-only` avalia só os produtos rotulados à mão.
 - `make pipeline` (etapa 4): os avisos esperados de cada produto também usam os rótulos manuais.

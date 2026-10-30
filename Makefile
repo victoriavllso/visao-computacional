@@ -1,4 +1,4 @@
-.PHONY: setup setup-dev download pipeline test label
+.PHONY: setup setup-dev download pipeline test label compact-labels
 
 setup:
 	python3 src/setup/setup_env.py
@@ -17,3 +17,6 @@ test:
 
 label:
 	python3 src/labeling/server.py $(if $(LABELER),--labeler $(LABELER))
+
+compact-labels:
+	python3 src/labeling/labels.py --compact

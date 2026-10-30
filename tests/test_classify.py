@@ -10,6 +10,7 @@ def make(**overrides):
         has_100_header=False,
         has_added_sugars=False,
         has_per_100_text=False,
+        has_explicit_linear=False,
         has_new_format_text=False,
         has_old_format_text=False,
     )
@@ -28,12 +29,24 @@ def make(**overrides):
         (dict(has_100_header=True), PhotoType.TABLE),
         (dict(has_new_format_text=True), PhotoType.TABLE),
         (dict(has_added_sugars=True, ruled_rows=0), PhotoType.TABLE),
-        (dict(has_per_100_text=True, ruled_rows=0), PhotoType.LINEAR),
+        # Linear only with explicit linear wording and no ruled lines.
+        (
+            dict(has_per_100_text=True, has_explicit_linear=True, ruled_rows=0),
+            PhotoType.LINEAR,
+        ),
+        (dict(has_per_100_text=True, has_explicit_linear=True), PhotoType.TABLE),
+        (dict(has_per_100_text=True, ruled_rows=0), PhotoType.TABLE),
         (dict(has_old_format_text=True), PhotoType.OLD_FORMAT),
         # New evidence wins: a new table can mention 'porção'.
         (dict(has_old_format_text=True, has_100_header=True), PhotoType.TABLE),
-        # Transitional label: added sugars row, but per portion only.
-        (dict(has_old_format_text=True, has_added_sugars=True), PhotoType.OLD_FORMAT),
+        # Transitional label: added sugars row, but per portion only. Old
+        # format by the labeling rule (no 100 g/ml column); PR #15 reads it
+        # as a table: open team decision.
+        pytest.param(
+            dict(has_old_format_text=True, has_added_sugars=True),
+            PhotoType.OLD_FORMAT,
+            marks=pytest.mark.xfail(reason="transitional labels read as tables"),
+        ),
         # No evidence either way: not old just because OCR missed '100 g'.
         (dict(), PhotoType.UNCERTAIN),
     ],

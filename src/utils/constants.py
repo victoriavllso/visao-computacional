@@ -4,12 +4,15 @@ PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 VENV_DIR: Path = PROJECT_ROOT / ".venv"
 REQUIREMENTS_FILE: Path = PROJECT_ROOT / "requirements.txt"
 DEV_REQUIREMENTS_FILE: Path = PROJECT_ROOT / "requirements-dev.txt"
-NODEPS_REQUIREMENTS_FILE: Path = PROJECT_ROOT / "requirements-nodeps.txt"
 DATA_DIR: Path = PROJECT_ROOT / "data"
 DATASET_DIR: Path = DATA_DIR / "product-database"
 
 HF_REPO_ID: str = "openfoodfacts/product-database"
 HF_REPO_TYPE: str = "dataset"
+# The dataset is updated daily: pin the snapshot (2026-10-18 18:29 UTC, the
+# last one before IMAGE_END_CUTOFF was set) so everyone regenerates the same
+# products. It has every hand-labeled product (2,571 pairs).
+HF_REVISION: str = "e7f6e1c9187651f6cfdffa051d6a8c99a187ecc6"
 HF_FOOD_FILE: str = "food.parquet"
 HF_BEAUTY_FILE: str = "beauty.parquet"
 
@@ -22,8 +25,7 @@ OFF_EXPECTED_WARNINGS_FILE: Path = (
     FILTER_PAIRS_OUTPUT_DIR / "off_expected_warnings.parquet"
 )
 
-# Hand labels are versioned (outside data/), to share with the team: one
-# file per person, so git merges never conflict.
+# Hand labels are versioned (outside data/), to share with the team.
 BACK_LABELS_DIR: Path = PROJECT_ROOT / "labels" / "back"
 
 # Selected-image keys used for each side of the package. Open Food Facts has

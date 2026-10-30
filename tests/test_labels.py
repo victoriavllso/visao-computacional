@@ -1,7 +1,7 @@
 import json
 from types import SimpleNamespace
 
-from labeling.labels import load_labels, truth_facts
+from labeling.labels import compact_labels, load_labels, truth_facts
 from rules.anvisa import Basis
 
 
@@ -100,3 +100,34 @@ def test_most_recent_label_wins_across_people(tmp_path):
 
     assert labels["789"]["sodium"] == 3 and labels["789"]["labeler"] == "bruno"
     assert len(labels) == 2
+
+
+def test_broken_lines_are_skipped(tmp_path):
+    (tmp_path / "hand-labeled.jsonl").write_text(
+        '{"code": "789", "status": "ok", "sodium": 1}\n'
+        '{"code": "123", "sta\n'  # write cut short
+        "<<<<<<< HEAD\n"  # merge conflict marker
+        '{"status": "ok"}\n'  # no barcode
+        '{"code": 456, "status": "ok", "sodium": 2}\n'
+    )
+
+    labels = load_labels(tmp_path)
+
+    assert sorted(labels) == ["456", "789"]
+
+
+def test_compact_keeps_latest_entry_per_barcode(tmp_path):
+    (tmp_path / "hand-labeled.jsonl").write_text(
+        '{"code": "789", "sodium": 1, "saved_at": "2026-10-10T10:00"}\n'
+        '{"code": "123", "sodium": 5, "saved_at": "2026-10-10T11:00"}\n'
+    )
+    (tmp_path / "bruno.jsonl").write_text(
+        '{"code": "789", "sodium": 3, "saved_at": "2026-10-11T09:00"}\n'
+    )
+
+    assert compact_labels(tmp_path) == (3, 2)
+
+    assert [path.name for path in tmp_path.iterdir()] == ["hand-labeled.jsonl"]
+    labels = load_labels(tmp_path)
+    assert labels["789"]["sodium"] == 3 and labels["789"]["labeler"] == "bruno"
+    assert labels["123"]["labeler"] == "hand-labeled"

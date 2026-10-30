@@ -30,8 +30,9 @@ All entry points are available as `make` targets from the project root:
 | `make setup-dev` | Same as above, plus dev tools and pre-commit hooks |
 | `make download` | Download the Open Food Facts dataset |
 | `make pipeline` | Run the full processing pipeline |
-| `make test` | Run the unit tests (needs `make setup-dev`) |
+| `make test` | Run the unit tests |
 | `make label` | Open the hand-labeling tool (see [LABELING.md](LABELING.md)) |
+| `make compact-labels` | Merge the hand label files into one, one entry per product |
 
 Typical first-time flow:
 
@@ -94,6 +95,13 @@ make download
 ```
 
 If the dataset files are already present in `data/product-database/`, the download is skipped automatically.
+
+The dataset is updated daily, so the download is pinned to one snapshot (`HF_REVISION` in `src/utils/constants.py`, 2026-10-18, 2,571 product pairs, with every hand-labeled product): everyone gets the same products. If your copy came from another snapshot, `make download` replaces it; then delete the filtered files and run `make pipeline` again (images already downloaded are kept):
+
+```bash
+rm -r data/brazil data/brazil_pairs/*.parquet
+make pipeline
+```
 
 #### Options (advanced):
 If you need a custom directory or token, call the script directly:
@@ -234,6 +242,10 @@ Use `--debug` to save intermediate images and a JSON summary for every product t
 
 Debug mode runs sequentially (no multiprocessing) for cleaner output. Combine with `--limit` to debug a few products quickly:
 
+```bash
+python src/evaluation/back.py --split dev --hand-only --limit 5 --debug
+```
+
 Each metric counts only products whose true value or decision is known. Per nutrient: *label* (row found), *found* (value read), *correct* (within 5%), *decision* (same warning decision as the truth). Photos classified as not readable get no values (the pipeline abstains). The report has the photo type confusion matrix against the hand labels and the metrics on three subsets: all photos end-to-end, predicted readable, and **hand-labeled readable** (the unmasked score).
 
 ### Final score: validation set (held out, hand-labeled)
@@ -243,11 +255,13 @@ All 395 val products labeled by hand (280 tables, 36 linear, 46 old format, 33 w
 | | Value |
 | :--- | ---: |
 | **Readable photos with all three warning decisions right** | **57.1%** |
-| Decision right: added sugars / saturated fat / sodium | 76.9% / 72.7% / 79.1% |
-| When the pipeline says "readable": all three right | 59.9% |
-| Photo type accuracy | 82.8% |
-| Readable tables left without an answer | 7 of 280 |
-| Old-format labels wrongly checked as tables | 14 of 46 |
+| Decision right: added sugars / saturated fat / sodium | 76.9% / 73.1% / 79.4% |
+| When the pipeline says "readable": all three right | 58.9% |
+| Photo type accuracy | 81.0% |
+| Readable tables left without an answer | 2 of 280 |
+| Old-format labels wrongly checked as tables | 17 of 46 |
+
+Measured with the classifier from PR #15, on the 2026-10-10 snapshot (before the pin to 2026-10-18, which adds 4 val products and changes one val photo). Before PR #15 the headline was the same, 57.1%: fewer tables go unanswered (7 → 2 of 280), but more old-format labels are checked as tables (14 → 17 of 46), and no photo is classified as linear anymore (28 of 36 read as tables, which is harmless: both are read the same way).
 
 About 9 points below dev (66.5%): the decisions made on dev errors fit dev better than new photos. Val also has twice the share of old-format labels (12% vs 6%), and old-format detection is what generalizes worst. Improvements are developed on dev; val is only for checking them at the end.
 

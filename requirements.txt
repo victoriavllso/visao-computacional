@@ -24,7 +24,6 @@ narwhals==2.27.1
 numpy==2.5.4
 onnxruntime==1.31.0
 opencv-python==5.0.0.93
-opencv-python-headless==5.0.0.93
 packaging==26.3
 pandas==3.0.6
 pillow==12.3.0
@@ -33,9 +32,10 @@ pyarrow==25.0.1
 pyclipper==1.4.0
 pyparsing==3.3.3
 pytesseract==0.3.13
+pytest==8.4.2
 python-dateutil==2.9.0.post0
 PyYAML==6.0.3
-rapidocr-onnxruntime==1.4.4
+rapidocr-onnxruntime==1.2.3
 requests==2.34.2
 scikit-learn==1.9.1
 scipy==1.18.1

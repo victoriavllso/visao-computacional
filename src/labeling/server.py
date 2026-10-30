@@ -26,7 +26,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 import cv2
 import pandas as pd
 
-from labeling.labels import load_labels
+from labeling.labels import DEFAULT_LABELER, load_labels
 from utils.constants import (
     BACK_LABELS_DIR,
     DATA_DIR,
@@ -78,7 +78,6 @@ def shuffled(codes):
     return codes
 
 
-DEFAULT_LABELER = "hand-labeled"
 REVIEW_NOTES = ("100g header", "100 g header", "per portion", "por porção")
 
 
@@ -212,7 +211,7 @@ def main():
     parser.add_argument(
         "--labeler",
         default=DEFAULT_LABELER,
-        help=f"label file name; one per person avoids git conflicts (default: {DEFAULT_LABELER})",
+        help=f"label file name (default: {DEFAULT_LABELER})",
     )
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()

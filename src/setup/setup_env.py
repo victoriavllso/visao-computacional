@@ -10,7 +10,6 @@ from utils.constants import (
     VENV_DIR,
     REQUIREMENTS_FILE,
     DEV_REQUIREMENTS_FILE,
-    NODEPS_REQUIREMENTS_FILE,
     DATA_DIR,
 )
 from utils.logger import Logger
@@ -75,7 +74,7 @@ def upgrade_pip(pip: Path) -> None:
     log.info("pip upgraded.")
 
 
-def install_requirements(pip: Path, requirements: Path, no_deps: bool = False) -> None:
+def install_requirements(pip: Path, requirements: Path) -> None:
     """Install packages from a requirements file."""
     req_path = requirements
 
@@ -86,10 +85,7 @@ def install_requirements(pip: Path, requirements: Path, no_deps: bool = False) -
     log.blank()
     log.info(f"Installing packages from {req_path} …")
     log.blank()
-    command = [str(pip), "install", "-r", str(req_path)]
-    if no_deps:
-        command.append("--no-deps")
-    subprocess.check_call(command)
+    subprocess.check_call([str(pip), "install", "-r", str(req_path)])
     log.blank()
     log.info("All packages installed successfully.")
 
@@ -166,7 +162,6 @@ def main() -> None:
         install_pre_commit_hooks(venv_path)
     else:
         install_requirements(pip, REQUIREMENTS_FILE)
-    install_requirements(pip, NODEPS_REQUIREMENTS_FILE, no_deps=True)
 
     ensure_data_dir()
     print_activation_hint(venv_path)

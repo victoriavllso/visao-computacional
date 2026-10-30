@@ -1,4 +1,0 @@
-# Installed with --no-deps: rapidocr_onnxruntime requires opencv-python,
-# which would replace opencv-python-headless (both provide cv2) with an
-# incompatible version. Its other dependencies are in requirements.txt.
-rapidocr_onnxruntime==1.2.3
