@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from utils.constants import DATASET_DIR, HF_REPO_ID, HF_REPO_TYPE
+from utils.constants import DATASET_DIR, HF_REPO_ID, HF_REPO_TYPE, HF_REVISION
 from utils.logger import Logger
 
 log = Logger("dataset download")
@@ -38,7 +38,7 @@ def download_dataset(local_dir: Path) -> None:
     local_dir.mkdir(parents=True, exist_ok=True)
 
     log.blank()
-    log.info(f"Downloading {HF_REPO_ID} → {local_dir.resolve()} …")
+    log.info(f"Downloading {HF_REPO_ID}@{HF_REVISION[:7]} → {local_dir.resolve()} …")
     log.info("This may take a while — the dataset is large.")
     log.blank()
 
@@ -48,6 +48,8 @@ def download_dataset(local_dir: Path) -> None:
         "--repo-type",
         HF_REPO_TYPE,
         HF_REPO_ID,
+        "--revision",
+        HF_REVISION,
         "--local-dir",
         str(local_dir),
     ]

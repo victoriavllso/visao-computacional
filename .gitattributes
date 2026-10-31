@@ -1,0 +1,3 @@
+# Label files only get lines appended: on a merge keep both sides (the most
+# recent label per barcode wins when loading).
+labels/**/*.jsonl merge=union

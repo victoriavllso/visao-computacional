@@ -8,10 +8,8 @@ from utils.constants import (
     AWS_BASE_URL,
     OFF_BASE_URL,
     USER_AGENT,
-    FILTER_FRONT_OUTPUT_FILE,
-    #FILTER_BACK_OUTPUT_FILE,
-    IMAGES_FRONT_OUTPUT_DIR,
-    #IMAGES_BACK_OUTPUT_DIR,
+    FILTER_PAIRS_OUTPUT_FILE,
+    IMAGES_OUTPUT_DIR,
     IMAGE_SIZE,
     MAX_CONCURRENT_DOWNLOADS,
     MAX_RETRIES,
@@ -26,21 +24,6 @@ log = Logger("pipeline")
 # Dados das imagens
 # ============================================================
 
-def get_image(images, image_type):
-
-    if images is None:
-        return None
-
-    for image in images:
-        if (
-            isinstance(image, dict)
-            and image.get("key") == image_type
-        ):
-            return image
-
-    return None
-
-
 def get_product_path(code):
     code = str(code).strip().zfill(13)
 
@@ -52,43 +35,19 @@ def get_product_path(code):
     )
 
 
-def get_aws_image_filename(image):
-    imgid = int(image["imgid"])
+def get_raw_image_filename(imgid):
+    # Raw uploads, not the selected crops: same file on both servers and
+    # closest to a photo taken with a phone.
+    if IMAGE_SIZE == "full":
+        return f"{int(imgid)}.jpg"
 
-    return f"{imgid}.{IMAGE_SIZE}.jpg"
-
-
-def get_off_image_filename(image_type, image):
-    rev = int(image["rev"])
-
-    return f"{image_type}.{rev}.{IMAGE_SIZE}.jpg"
+    return f"{int(imgid)}.{IMAGE_SIZE}.jpg"
 
 
-def get_image_urls(code, image, image_type):
-    product_path = get_product_path(code)
+def get_image_urls(code, imgid):
+    path = f"{get_product_path(code)}/{get_raw_image_filename(imgid)}"
 
-    aws_filename = get_aws_image_filename(
-        image=image,
-    )
-
-    off_filename = get_off_image_filename(
-        image_type=image_type,
-        image=image,
-    )
-
-    aws_url = (
-        f"{AWS_BASE_URL}/"
-        f"{product_path}/"
-        f"{aws_filename}"
-    )
-
-    off_url = (
-        f"{OFF_BASE_URL}/"
-        f"{product_path}/"
-        f"{off_filename}"
-    )
-
-    return aws_url, off_url
+    return f"{AWS_BASE_URL}/{path}", f"{OFF_BASE_URL}/{path}"
 
 async def download_from_url(
     client,
@@ -153,8 +112,7 @@ async def download_product_image(
     client,
     semaphore,
     code,
-    images,
-    image_type,
+    imgid,
     output_dir,
 ):
 
@@ -163,22 +121,16 @@ async def download_product_image(
     if output_path.exists():
         return "exists"
 
-    image = get_image(
-        images=images,
-        image_type=image_type,
-    )
-
-    if image is None:
+    if imgid is None:
         return "no_image"
 
     try:
         aws_url, off_url = get_image_urls(
             code=code,
-            image=image,
-            image_type=image_type,
+            imgid=imgid,
         )
-    except (KeyError, TypeError, ValueError):
-        log.error("invalid_image_data")
+    except (TypeError, ValueError):
+        return "invalid_image_data"
 
     async with semaphore:
 
@@ -253,8 +205,7 @@ def create_download_tasks(
                     client=client,
                     semaphore=semaphore,
                     code=code,
-                    images=product.images,
-                    image_type=image_type,
+                    imgid=getattr(product, f"{image_type}_imgid"),
                     output_dir=output_dir,
                 )
             )
@@ -374,30 +325,16 @@ async def download_images(
     )
 
 # ============================================================
-# Front
+# Front + nutrition
 # ============================================================
 
-def download_front_images():
+def download_pair_images():
 
-    asyncio.run(
-        download_images(
-            input_file=FILTER_FRONT_OUTPUT_FILE,
-            image_type="front_pt",
-            output_dir=IMAGES_FRONT_OUTPUT_DIR,
+    for image_type in ("front", "nutrition"):
+        asyncio.run(
+            download_images(
+                input_file=FILTER_PAIRS_OUTPUT_FILE,
+                image_type=image_type,
+                output_dir=IMAGES_OUTPUT_DIR / image_type,
+            )
         )
-    )
-
-
-# ============================================================
-# Back
-# ============================================================
-
-#def download_back_images():
-
-#    asyncio.run(
-#        download_images(
-#            input_file=FILTER_BACK_OUTPUT_FILE,
-#            image_type="back_pt",
-#            output_dir=IMAGES_BACK_OUTPUT_DIR,
-#        )
-#    )

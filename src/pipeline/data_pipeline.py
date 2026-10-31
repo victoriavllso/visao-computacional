@@ -1,14 +1,16 @@
 import sys
 from pathlib import Path
 import argparse
+
 sys.path.append(str(Path(__file__).parent.parent))
 sys.path.append(str(Path(__file__).parent))
 
-from ingestion.download_images import download_front_images
+from ingestion.download_images import download_pair_images
 from utils.constants import DATASET_DIR
 from utils.logger import Logger
 from preprocessing.filter_brazil import filter_brazil
-from preprocessing.filter_images import filter_front
+from preprocessing.filter_images import filter_pairs
+from rules.off import expected_warnings_from_off
 import time
 
 log = Logger("pipeline")
@@ -36,16 +38,20 @@ def main() -> None:
     log.blank()
     filter_brazil(args.dataset_dir)
 
-    log.info("Stage 2 — Filter front_pt")
+    log.info("Stage 2 — Filter front + nutrition pairs")
     log.blank()
-    filter_front()
+    filter_pairs()
 
-    log.info("Stage 3 — Download fron images")
+    log.info("Stage 3 — Download front + nutrition images")
     log.blank()
     inicio = time.perf_counter()
-    download_front_images()
-    fim= time.perf_counter()
-    print(f'tempo de execução: {fim-inicio}')
+    download_pair_images()
+    fim = time.perf_counter()
+    print(f"tempo de execução: {fim-inicio}")
+
+    log.info("Stage 4 — Expected warnings from OFF data")
+    log.blank()
+    expected_warnings_from_off()
 
     log.blank()
     log.info("Pipeline complete.")
