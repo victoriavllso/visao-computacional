@@ -15,15 +15,15 @@ def parse_args() -> argparse.Namespace:
         "input_file",
         nargs="?",
         type=Path,
-        default=Path("data/evaluation/back_dev_locate_prep.csv"),
-        help="Path to the evaluation CSV file (default: data/evaluation/back_dev_locate_prep.csv)",
+        default=Path("data/evaluation/latest/back_dev.csv"),
+        help="Path to the evaluation CSV file (default: data/evaluation/latest/back_dev.csv)",
     )
     parser.add_argument(
         "--output-dir",
         "-o",
         type=Path,
         default=None,
-        help="Directory to save output files (default: data/evaluation/results)",
+        help="Directory to save output files (default: same directory as the input file)",
     )
     return parser.parse_args()
 

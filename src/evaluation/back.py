@@ -177,37 +177,60 @@ def _metric_row(results, nutrient):
     return row
 
 
-def _metric_block_md(results, title):
+def compute_subset_metrics(subset: pd.DataFrame) -> dict:
+    """Compute all nutrient metrics and all-three score for one subset."""
+    nutrient_rows = {nutrient: _metric_row(subset, nutrient) for nutrient in Nutrient}
+
+    all_three = float("nan")
+    complete_count = 0
+    columns = [f"{n.value}_decision_correct" for n in Nutrient]
+    if set(columns) <= set(subset.columns):
+        complete = subset[columns].dropna()
+        complete_count = len(complete)
+        if complete_count:
+            all_three = complete.astype(bool).all(axis=1).mean()
+
+    return {
+        "count": len(subset),
+        "nutrients": nutrient_rows,
+        "all_three": all_three,
+        "complete_count": complete_count,
+    }
+
+
+def _format_metric_block_md(title: str, metrics_data: dict) -> str:
     """Return a Markdown string for one metric subset."""
-    lines = [f"### {title} ({len(results)} products)", ""]
+    lines = [f"### {title} ({metrics_data['count']} products)", ""]
     lines.append(
         f"| {'Nutrient':<15} | {'Label':>7} | {'Found':>7} | {'Correct':>8} | {'Decision':>9} |"
     )
     lines.append(f"| {'-'*15} | {'-'*7} | {'-'*7} | {'-'*8} | {'-'*9} |")
+
+    def fmt(v):
+        return f"{v:.1%}" if v == v else "n/a"  # NaN check
+
     for nutrient in Nutrient:
-        row = _metric_row(results, nutrient)
+        row = metrics_data["nutrients"][nutrient]
         name = nutrient.value
-
-        def fmt(v):
-            return f"{v:.1%}" if v == v else "n/a"  # NaN check
-
         lines.append(
             f"| {name:<15} | {fmt(row[f'{name}_label']):>7} | {fmt(row[f'{name}_found']):>7}"
             f" | {fmt(row[f'{name}_correct']):>8} | {fmt(row[f'{name}_decision_correct']):>9} |"
         )
 
-    columns = [f"{n.value}_decision_correct" for n in Nutrient]
-    if set(columns) <= set(results.columns):
-        complete = results[columns].dropna()
-        if len(complete):
-            all_correct = complete.astype(bool).all(axis=1).mean()
-            lines.append("")
-            lines.append(
-                f"**All three decisions correct:** {all_correct:.1%}"
-                f" (of {len(complete)} products with all three decisions known)"
-            )
+    all_three = metrics_data["all_three"]
+    if all_three == all_three:  # not NaN
+        lines.append("")
+        lines.append(
+            f"**All three decisions correct:** {all_three:.1%}"
+            f" (of {metrics_data['complete_count']} products with all three decisions known)"
+        )
 
     return "\n".join(lines)
+
+
+def _metric_block_md(results, title):
+    """Return a Markdown string for one metric subset (backward compatibility)."""
+    return _format_metric_block_md(title, compute_subset_metrics(results))
 
 
 def _format_confusion_matrix(typed: pd.DataFrame) -> list[str]:
@@ -366,14 +389,25 @@ def _format_numerical_errors(results: pd.DataFrame) -> list[str]:
                 )
 
     if not has_data:
-        return []
+        lines = [
+            "## Numerical Extractions Error Analysis (MAE)",
+            "",
+            "*No numerical values available for comparison.*",
+            "",
+        ]
+        return lines
 
     lines.append("")
     return lines
 
 
 def _format_top_outliers(results: pd.DataFrame, top_n: int = 5) -> list[str]:
-    """Identify and format products with the largest numerical OCR misreads."""
+    """Identify and format products with the largest numerical OCR differences between read and true values."""
+    lines = [
+        f"### Top {top_n} Largest Numerical Differences (Read vs Ground Truth)",
+        "",
+    ]
+
     outliers = []
     for nutrient in Nutrient:
         name = nutrient.value
@@ -389,20 +423,24 @@ def _format_top_outliers(results: pd.DataFrame, top_n: int = 5) -> list[str]:
             outliers.append(valid[["code", "nutrient", "read_val", "true_val", "diff"]])
 
     if not outliers:
-        return []
+        lines.append("*No evaluated products with numerical values to compare.*")
+        lines.append("")
+        return lines
 
     df_outliers = (
         pd.concat(outliers).sort_values(by="diff", ascending=False).head(top_n)
     )
     if len(df_outliers) == 0 or df_outliers["diff"].max() == 0:
-        return []
+        lines.append("*All read numerical values match ground truth (no differences).*")
+        lines.append("")
+        return lines
 
-    lines = [
-        f"### Top {top_n} Largest Numerical Discrepancies",
-        "",
-        "| Product Code | Nutrient | Read Value | True Value | Absolute Difference |",
-        "| :---: | :---: | :---: | :---: | :---: |",
-    ]
+    lines.extend(
+        [
+            "| Product Code | Nutrient | Read Value (Predicted) | True Value (Ground Truth) | Absolute Difference |",
+            "| :---: | :---: | :---: | :---: | :---: |",
+        ]
+    )
     for _, row in df_outliers.iterrows():
         unit = "mg" if row["nutrient"] == "sodium" else "g"
         lines.append(
@@ -413,7 +451,11 @@ def _format_top_outliers(results: pd.DataFrame, top_n: int = 5) -> list[str]:
 
 
 def write_markdown_report(
-    results: pd.DataFrame, output_csv: Path, args, elapsed_time: float = 0.0
+    results: pd.DataFrame,
+    output_csv: Path,
+    args,
+    elapsed_time: float = 0.0,
+    subsets_metrics: dict | None = None,
 ):
     """Write a comprehensive Markdown summary of the evaluation run beside the CSV output."""
     errors_df = (
@@ -476,26 +518,12 @@ def write_markdown_report(
     lines.append("## Nutrient Extraction & Decision Metrics")
     lines.append("")
 
-    readable_types = {PhotoType.TABLE.value, PhotoType.LINEAR.value}
-    subsets = {
-        "All photos, end-to-end (abstaining counts as wrong)": results,
-    }
+    if subsets_metrics is None:
+        subsets_metrics = evaluate_subsets(results)
 
-    if "photo_type" in results.columns:
-        subsets["Predicted readable"] = results[
-            results["photo_type"].isin(readable_types)
-        ]
-
-    if "true_type" in results.columns and "photo_type" in results.columns:
-        typed = results.dropna(subset=["true_type"])
-        if len(typed):
-            subsets["Hand-labeled readable (unmasked)"] = typed[
-                typed["true_type"].isin(readable_types)
-            ]
-
-    for title, subset in subsets.items():
-        if len(subset) > 0:
-            lines.append(_metric_block_md(subset, title))
+    for title, m in subsets_metrics.items():
+        if m["count"] > 0:
+            lines.append(_format_metric_block_md(title, m))
             lines.append("")
 
     # Error & Exception Breakdown
@@ -529,7 +557,61 @@ def rate(results, column):
     return values.astype(bool).mean() if len(values) else float("nan")
 
 
-def summarize(results):
+def build_subsets(results: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Compute the named subsets for metric reporting."""
+    readable_types = {PhotoType.TABLE.value, PhotoType.LINEAR.value}
+    subsets = {
+        "All photos, end-to-end (abstaining counts as wrong)": results,
+    }
+
+    if "photo_type" in results.columns:
+        subsets["Predicted readable"] = results[
+            results["photo_type"].isin(readable_types)
+        ]
+
+    if "true_type" in results.columns:
+        typed = results.dropna(subset=["true_type"])
+        if len(typed):
+            subsets["Hand-labeled readable (unmasked)"] = typed[
+                typed["true_type"].isin(readable_types)
+            ]
+
+    return subsets
+
+
+def evaluate_subsets(results: pd.DataFrame) -> dict[str, dict]:
+    """Compute metrics for all standard subsets of results."""
+    return {
+        title: compute_subset_metrics(subset)
+        for title, subset in build_subsets(results).items()
+    }
+
+
+def _print_metrics_terminal(metrics_data: dict):
+    def fmt(v):
+        return f"{v:.1%}" if v == v else "n/a"
+
+    print(f"{'nutrient':<15} {'label':>7} {'found':>7} {'correct':>8} {'decision':>9}")
+    for nutrient in Nutrient:
+        name = nutrient.value
+        row = metrics_data["nutrients"][nutrient]
+        print(
+            f"{name:<15} "
+            f"{fmt(row[f'{name}_label']):>7} "
+            f"{fmt(row[f'{name}_found']):>7} "
+            f"{fmt(row[f'{name}_correct']):>8} "
+            f"{fmt(row[f'{name}_decision_correct']):>9}"
+        )
+
+    all_three = metrics_data["all_three"]
+    if all_three == all_three:
+        log.info(
+            f"All three decisions correct: {all_three:.1%}"
+            f" (of {metrics_data['complete_count']} products with all three decisions known)"
+        )
+
+
+def summarize(results: pd.DataFrame, subsets_metrics: dict | None = None):
     errors = results["error"].notna().sum() if "error" in results else 0
     log.info(f"Products: {len(results)}   errors: {errors}")
     log.info(f"Ground truth: {results.truth.value_counts().to_dict()}")
@@ -549,47 +631,17 @@ def summarize(results):
                 f"Photo type accuracy: {(typed.true_type == typed.photo_type).mean():.1%}"
             )
 
-    readable = {PhotoType.TABLE.value, PhotoType.LINEAR.value}
-    subsets = {
-        "All photos, end-to-end (abstaining counts as wrong)": results,
-    }
-    if "photo_type" in results:
-        subsets["Predicted readable"] = results[results.photo_type.isin(readable)]
+    if subsets_metrics is None:
+        subsets_metrics = evaluate_subsets(results)
 
-    if "true_type" in results and "photo_type" in results:
-        typed = results.dropna(subset=["true_type", "photo_type"])
-        if len(typed):
-            subsets["Hand-labeled readable (unmasked)"] = typed[
-                typed.true_type.isin(readable)
-            ]
-
-    for title, subset in subsets.items():
+    for title, m in subsets_metrics.items():
         log.blank()
-        log.info(f"{title}: {len(subset)} products")
-        metrics(subset)
+        log.info(f"{title}: {m['count']} products")
+        _print_metrics_terminal(m)
 
 
 def metrics(results):
-    print(f"{'nutrient':<15} {'label':>7} {'found':>7} {'correct':>8} {'decision':>9}")
-    for nutrient in Nutrient:
-        name = nutrient.value
-        print(
-            f"{name:<15} "
-            f"{rate(results, f'{name}_label'):>7.1%} "
-            f"{rate(results, f'{name}_found'):>7.1%} "
-            f"{rate(results, f'{name}_correct'):>8.1%} "
-            f"{rate(results, f'{name}_decision_correct'):>9.1%}"
-        )
-
-    # Products where all three decisions are known and correct.
-    columns = [f"{n.value}_decision_correct" for n in Nutrient]
-    if not set(columns) <= set(results.columns):
-        return
-    complete = results[columns].dropna()
-    log.info(
-        f"All three decisions correct: {complete.astype(bool).all(axis=1).mean():.1%}"
-        f" (of {len(complete)} products with all three decisions known)"
-    )
+    _print_metrics_terminal(compute_subset_metrics(results))
 
 
 def parse_args():
@@ -648,9 +700,21 @@ def main():
     output = run_dir / f"back_{args.split}_{run_name}.csv"
     results.to_csv(output, index=False)
 
-    summarize(results)
-    write_markdown_report(results, output, args, elapsed_time=elapsed)
+    subsets_metrics = evaluate_subsets(results)
+    summarize(results, subsets_metrics=subsets_metrics)
+    write_markdown_report(
+        results, output, args, elapsed_time=elapsed, subsets_metrics=subsets_metrics
+    )
     log.info(f"Per-product results: {output}")
+
+    latest_dir = EVAL_DIR / "latest"
+    latest_dir.mkdir(parents=True, exist_ok=True)
+    for ext in (".csv", ".md"):
+        link = latest_dir / f"back_{args.split}{ext}"
+        target = output.with_suffix(ext)
+        link.unlink(missing_ok=True)
+        link.symlink_to(os.path.relpath(target, latest_dir))
+    log.info(f"Updated latest symlinks in {latest_dir}")
 
 
 if __name__ == "__main__":

@@ -226,6 +226,8 @@ photo ─► locate ─► almost no text? ────────────�
 python src/evaluation/back.py --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug]
 ```
 
+Results are saved to `data/evaluation/back_<split>_<timestamp>_<tag>/` (CSV + Markdown report). Symlinks in `data/evaluation/latest/` (`back_dev.csv`, `back_val.csv` and `.md` reports) always point to the most recent run for each split. Other tools (labeling server, confusion matrix) read from `latest/` by default; pass an explicit path to use a specific run.
+
 Use `--debug` to save intermediate images and a JSON summary for every product to `data/debug/<code>/`. The output per product is:
 
 | File | Contents |
