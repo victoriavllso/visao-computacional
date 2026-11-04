@@ -61,13 +61,33 @@ Casos especiais vão no campo **Note**. Exemplo: tabela com colunas de 100 g **e
 
 "skip already labeled" pula o que você ou outra pessoa já rotulou (de quem você já deu `git pull`). Se o mesmo produto for rotulado por duas pessoas, vale o rótulo mais recente.
 
+## 3b. Frente: avisos "ALTO EM"
+
+No topo da página, **front labels →** (ou <http://localhost:8765/front>) abre a rotulagem da foto da frente. Os rótulos vão para `labels/front/hand-labeled.jsonl`. As filas são as mesmas (`val`, `dev`); comece pela `val`.
+
+Para cada produto:
+
+1. Marque os avisos que aparecem na foto: **açúcar adicionado** (`1`), **gordura saturada** (`2`), **sódio** (`3`). Nenhum marcado = a foto não tem aviso.
+2. **Arraste sobre a foto** um retângulo em volta de cada painel de aviso (o retângulo preto com a lupa, incluindo o "ALTO EM"). Se os avisos estão num painel só, é uma caixa só. `Z` amplia a foto; **Undo box** desfaz a última caixa. As caixas servem para treinar o detector, então capriche no enquadramento.
+3. Escolha a situação da foto:
+
+| Situação | Quando |
+| :--- | :--- |
+| **front of the package** | A frente da embalagem aparece (com ou sem aviso) |
+| **a warning is there, but which one can't be read** | Dá para ver o painel, mas não ler quais avisos (borrado, cortado, pequeno demais). Desenhe a caixa mesmo assim |
+| **not the front / package not visible** | A foto não é da frente (verso, lateral, outro objeto) |
+
+4. **Enter** salva e vai para o próximo.
+
+Marque só o que está **na foto**, mesmo que você saiba (ou o verso indique) que o produto deveria ter aviso: é exatamente isso que vamos comparar. Por isso a página não mostra nada do verso.
+
 ## 4. Enviar
 
 Envie com frequência, para os outros não repetirem os mesmos produtos:
 
 ```bash
 git pull
-git add labels/back/
+git add labels/
 git commit -m "labels: +N produtos"
 git push
 ```
