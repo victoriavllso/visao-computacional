@@ -39,7 +39,7 @@ from vision.back.locate import locate_table
 log = Logger("labeling")
 
 PAGE = Path(__file__).parent / "page.html"
-EVAL_RESULTS = DATA_DIR / "evaluation" / "back_dev_locate_prep.csv"
+EVAL_RESULTS = DATA_DIR / "evaluation" / "latest" / "back_dev.csv"
 NUTRIENTS = ("added_sugars", "saturated_fat", "sodium")
 
 
@@ -86,7 +86,7 @@ def latest_photo_types():
     photos, or {} if there is none."""
     runs = [
         path
-        for path in (DATA_DIR / "evaluation").glob("back_*.csv")
+        for path in (DATA_DIR / "evaluation" / "latest").glob("back_*.csv")
         if "photo_type" in path.open().readline().split(",")
     ]
     if not runs:

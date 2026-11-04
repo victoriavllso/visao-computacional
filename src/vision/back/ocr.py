@@ -171,13 +171,36 @@ def read_words_rapidocr(image) -> list[Word]:
     global _rapidocr
     if _rapidocr is None:
         _limit_onnx_threads()
-        from rapidocr_onnxruntime import RapidOCR
+        import logging
+
+        # We try to import RapidOCR first, but if it is not installed, we fall back to RapidOCR-ONNXRuntime.
+        try:
+            from rapidocr import RapidOCR
+        except ImportError:
+            from rapidocr_onnxruntime import RapidOCR
 
         _rapidocr = RapidOCR()
 
+        # Set RapidOCR's logger to ERROR level to avoid excessive logging output
+        ocr_logger = logging.getLogger("RapidOCR")
+        ocr_logger.setLevel(logging.ERROR)
+
     if image.ndim == 2:
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-    result, _ = _rapidocr(image)
+    output = _rapidocr(image)
+
+    # Handle RapidOCROutput dataclass object
+    if hasattr(output, "boxes") and output.boxes is not None:
+        # Convert back to the expected [[bbox, text, score], ...] list format
+        result = [
+            [box, text, score]
+            for box, text, score in zip(output.boxes, output.txts, output.scores)
+        ]
+    # Handle standard tuple/list returns if using older/alternative packages
+    elif isinstance(output, (tuple, list)):
+        result = output[0]
+    else:
+        result = None
 
     words = []
     for box, text, score in result or []:
