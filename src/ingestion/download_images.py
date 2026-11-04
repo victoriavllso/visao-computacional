@@ -13,7 +13,7 @@ from utils.constants import (
     IMAGE_SIZE,
     MAX_CONCURRENT_DOWNLOADS,
     MAX_RETRIES,
-    REQUEST_TIMEOUT
+    REQUEST_TIMEOUT,
 )
 from utils.logger import Logger
 
@@ -24,15 +24,11 @@ log = Logger("pipeline")
 # Dados das imagens
 # ============================================================
 
+
 def get_product_path(code):
     code = str(code).strip().zfill(13)
 
-    return (
-        f"{code[:3]}/"
-        f"{code[3:6]}/"
-        f"{code[6:9]}/"
-        f"{code[9:]}"
-    )
+    return f"{code[:3]}/" f"{code[3:6]}/" f"{code[6:9]}/" f"{code[9:]}"
 
 
 def get_raw_image_filename(imgid):
@@ -48,6 +44,7 @@ def get_image_urls(code, imgid):
     path = f"{get_product_path(code)}/{get_raw_image_filename(imgid)}"
 
     return f"{AWS_BASE_URL}/{path}", f"{OFF_BASE_URL}/{path}"
+
 
 async def download_from_url(
     client,
@@ -134,7 +131,7 @@ async def download_product_image(
 
     async with semaphore:
 
-        #AWS S3
+        # AWS S3
 
         downloaded = await download_from_url(
             client=client,
@@ -145,7 +142,7 @@ async def download_product_image(
         if downloaded:
             return "aws"
 
-        #Fallback Open Food Facts
+        # Fallback Open Food Facts
 
         downloaded = await download_from_url(
             client=client,
@@ -159,15 +156,13 @@ async def download_product_image(
     return "failed"
 
 
-
 # ============================================================
 # Pipeline de downloads
 # ============================================================
 
+
 def create_http_client():
-    timeout = httpx.Timeout(
-        REQUEST_TIMEOUT
-    )
+    timeout = httpx.Timeout(REQUEST_TIMEOUT)
 
     limits = httpx.Limits(
         max_connections=MAX_CONCURRENT_DOWNLOADS,
@@ -255,9 +250,7 @@ async def download_images(
     output_dir,
 ):
     if not input_file.exists():
-        raise FileNotFoundError(
-            f"Input file not found: {input_file}"
-        )
+        raise FileNotFoundError(f"Input file not found: {input_file}")
 
     output_dir.mkdir(
         parents=True,
@@ -273,9 +266,7 @@ async def download_images(
     print(f"Workers:  {MAX_CONCURRENT_DOWNLOADS}")
     log.blank()
 
-    semaphore = asyncio.Semaphore(
-        MAX_CONCURRENT_DOWNLOADS
-    )
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
 
     stats = {
         "aws": 0,
@@ -301,9 +292,7 @@ async def download_images(
                 len(df),
                 batch_size,
             ):
-                batch = df.iloc[
-                    start:start + batch_size
-                ]
+                batch = df.iloc[start : start + batch_size]
 
                 tasks = create_download_tasks(
                     batch=batch,
@@ -324,9 +313,11 @@ async def download_images(
         stats=stats,
     )
 
+
 # ============================================================
 # Front + nutrition
 # ============================================================
+
 
 def download_pair_images():
 
