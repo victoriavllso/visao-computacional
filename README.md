@@ -239,34 +239,34 @@ Each metric counts only products whose true value or decision is known. Per nutr
 
 ### Final score: validation set (held out, hand-labeled)
 
-All 395 val products labeled by hand (280 tables, 36 linear, 46 old format, 33 without a readable table). Nothing was tuned on val, so this is the honest estimate:
+All 397 val products labeled by hand (282 tables, 36 linear, 46 old format, 33 without a readable table), on the pinned 2026-10-18 snapshot, measured with the pixi environment. Nothing was tuned on val, so this is the honest estimate:
 
 | | Value |
 | :--- | ---: |
-| **Readable photos with all three warning decisions right** | **57.1%** |
-| Decision right: added sugars / saturated fat / sodium | 76.9% / 73.1% / 79.4% |
-| When the pipeline says "readable": all three right | 58.9% |
-| Photo type accuracy | 81.0% |
-| Readable tables left without an answer | 2 of 280 |
+| **Readable photos with all three warning decisions right** | **71.6%** |
+| Decision right: added sugars / saturated fat / sodium | 85.2% / 81.6% / 82.7% |
+| When the pipeline says "readable": all three right | 73.3% |
+| Photo type accuracy | 81.9% |
+| Readable tables left without an answer | 2 of 282 |
 | Old-format labels wrongly checked as tables | 17 of 46 |
 
-Measured with the classifier from PR #15, on the 2026-10-10 snapshot (before the pin to 2026-10-18, which adds 4 val products and changes one val photo). Before PR #15 the headline was the same, 57.1%: fewer tables go unanswered (7 → 2 of 280), but more old-format labels are checked as tables (14 → 17 of 46), and no photo is classified as linear anymore (28 of 36 read as tables, which is harmless: both are read the same way).
+The learned OCR library made the difference: on the same photos, labels and code, `rapidocr_onnxruntime` 1.2.3 gave 57.1% (dev: 62.8%) and `rapidocr` 3.10 gives 71.6% (dev: 77.4%), +14.5 points. The gain is in reading values (added sugars read right: 62% → 81%); the old library's text detector merged neighboring cells into one number (`338 | 338` → `338338`). Old-format detection is still the weakest point.
 
-About 9 points below dev (66.5%): the decisions made on dev errors fit dev better than new photos. Val also has twice the share of old-format labels (12% vs 6%), and old-format detection is what generalizes worst. Improvements are developed on dev; val is only for checking them at the end.
+Val is about 6 points below dev: the decisions made on dev errors fit dev better than new photos. Val also has far more old-format labels (12%, against 2% in dev), and old-format detection is what generalizes worst. Improvements are developed on dev; val is only for checking them at the end.
 
 ### Results on hand-labeled dev photos (unmasked)
 
-255 dev photos labeled by hand (187 tables, 20 linear, 15 old format, 33 without a readable table):
+929 dev photos labeled by hand (837 tables, 27 linear, 15 old format, 50 without a readable table), same snapshot and environment as val:
 
 | | Value |
 | :--- | ---: |
-| Photo type accuracy | 84.7% |
-| Readable tables wrongly rejected (no answer) | 4 of 187 |
-| Old-format labels wrongly checked as tables | 2 of 15 |
-| Readable photos with all three warning decisions right | **66.5%** |
-| Decision right: added sugars / saturated fat / sodium | 84.1% / 83.5% / 82.5% |
+| Photo type accuracy | 87.0% |
+| Readable tables wrongly rejected (no answer) | 52 of 837 |
+| Old-format labels wrongly checked as tables | 4 of 15 |
+| Readable photos with all three warning decisions right | **77.4%** |
+| Decision right: added sugars / saturated fat / sodium | 88.2% / 84.1% / 80.4% |
 
-Photos with no format evidence even after both OCR engines are treated as old format (abstain): of the 10 such photos, 6 were old format and none of the 3 tables among them was read right. With 176 labels the headline was 68.2%; the difference is within noise.
+Photos with no format evidence even after both OCR engines are treated as old format (abstain).
 
 The OFF-based figures below count unreadable photos (a quarter of them in the hand labels) and OFF errors as failures, so they understate the pipeline.
 
