@@ -1,22 +1,24 @@
+# Shortcuts for the pixi tasks (pixi.toml), for those used to make.
 .PHONY: setup setup-dev download pipeline test label compact-labels
 
 setup:
-	python3 src/setup/setup_env.py
+	pixi install
 
 setup-dev:
-	python3 src/setup/setup_env.py --dev
+	pixi install --environment dev
+	pixi run --environment dev hooks
 
 download:
-	python3 src/ingestion/download_dataset.py
+	pixi run download
 
 pipeline:
-	python3 src/pipeline/data_pipeline.py
+	pixi run pipeline
 
 test:
-	python3 -m pytest tests
+	pixi run test
 
 label:
-	python3 src/labeling/server.py $(if $(LABELER),--labeler $(LABELER))
+	pixi run label $(if $(LABELER),--labeler $(LABELER))
 
 compact-labels:
-	python3 src/labeling/labels.py --compact
+	pixi run compact-labels

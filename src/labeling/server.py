@@ -67,7 +67,10 @@ def build_queues():
         queues["dev_disagreements"] = shuffled(results[disagree].code)
     queues["dev"] = shuffled(products[products.split == "dev"].code)
 
-    return queues, off
+    # Upload time of each nutrition photo, to find labels made on an older one.
+    photo_times = dict(zip(products.code, products.nutrition_uploaded_t))
+
+    return queues, off, photo_times
 
 
 def shuffled(codes):
@@ -96,8 +99,10 @@ def latest_photo_types():
     return dict(zip(results.code, results.photo_type))
 
 
-def review_queue(labels):
+def review_queue(labels, photo_times=None):
     """{barcode: reason} for labels to check again:
+    - saved before the product's nutrition photo was uploaded: the photo was
+      replaced after labeling (photo_times: {barcode: upload time, epoch s});
     - readable without a basis marked: a 100 g/ml column must be there, else
       it's old format;
     - a note doubting the 100 g header;
@@ -108,7 +113,13 @@ def review_queue(labels):
 
     for code, label in labels.items():
         status, note = label.get("status"), (label.get("note") or "").lower()
-        if status in readable and not label.get("basis"):
+        uploaded = (photo_times or {}).get(code)
+        # saved_at is the labeler's local time; uploads are hours or days apart.
+        if uploaded and label.get("saved_at", "") < time.strftime(
+            "%Y-%m-%dT%H:%M:%S", time.localtime(uploaded)
+        ):
+            reasons[code] = "photo replaced after it was labeled"
+        elif status in readable and not label.get("basis"):
             reasons[code] = "readable, but no 100 g / 100 ml marked"
         elif status in readable and any(n in note for n in REVIEW_NOTES):
             reasons[code] = "note doubts the 100 g header"
@@ -135,7 +146,7 @@ def table_crop(code):
 
 
 class Handler(BaseHTTPRequestHandler):
-    queues, off, labels_file = None, None, None
+    queues, off, photo_times, labels_file = None, None, None, None
 
     def log_message(self, *args):
         pass
@@ -161,7 +172,7 @@ class Handler(BaseHTTPRequestHandler):
             name = parse_qs(url.query).get("name", ["val"])[0]
             labels = load_labels()
             # Computed per request: fixed labels drop out right away.
-            reasons = review_queue(labels) if name == "review" else {}
+            reasons = review_queue(labels, self.photo_times) if name == "review" else {}
             codes = list(reasons) if name == "review" else self.queues.get(name, [])
             items = [
                 {
@@ -218,7 +229,7 @@ def main():
 
     labeler = re.sub(r"[^A-Za-z0-9_-]", "_", args.labeler)
 
-    Handler.queues, Handler.off = build_queues()
+    Handler.queues, Handler.off, Handler.photo_times = build_queues()
     Handler.labels_file = BACK_LABELS_DIR / f"{labeler}.jsonl"
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     log.info(f"Labeling tool at http://localhost:{args.port}")

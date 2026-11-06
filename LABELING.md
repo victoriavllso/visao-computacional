@@ -6,23 +6,15 @@ Os rótulos manuais têm prioridade: se um produto foi rotulado à mão, a avali
 
 ## 1. Preparar (uma vez)
 
-Você precisa do código, do ambiente e das imagens. Enquanto a ferramenta não estiver na `main`, ela está no branch `phase1-data`:
+Você precisa do código, do ambiente e das imagens. O ambiente é criado pelo [pixi](https://pixi.sh) (instalação no README). Na raiz do projeto:
 
 ```bash
-git fetch
-git checkout phase1-data
+pixi install
+pixi run download
+pixi run pipeline
 ```
 
-Na raiz do projeto:
-
-```bash
-make setup
-source .venv/bin/activate
-make download
-make pipeline
-```
-
-`make download` baixa ~8 GB e `make pipeline` baixa ~5 GB de imagens. Se alguém do grupo já tem a pasta `data/`, copiar dela é mais rápido.
+`pixi run download` baixa ~8 GB e `pixi run pipeline` baixa ~5 GB de imagens. Se alguém do grupo já tem a pasta `data/`, copiar dela é mais rápido.
 
 Todos precisam usar o mesmo snapshot do OFF (fixado em `HF_REVISION`, 2026-10-18), senão a lista de produtos muda. Se você baixou o dataset antes desta versão, veja "Downloading the Dataset" no README.
 
@@ -30,8 +22,7 @@ Todos precisam usar o mesmo snapshot do OFF (fixado em `HF_REVISION`, 2026-10-18
 
 ```bash
 git pull
-source .venv/bin/activate
-make label
+pixi run label
 ```
 
 Abra <http://localhost:8765> no navegador. Os rótulos de todos vão para um único arquivo, `labels/back/hand-labeled.jsonl`. Cada salvamento acrescenta uma linha; o `git pull` junta as linhas de todos sem conflito (`merge=union` no `.gitattributes`).
@@ -81,10 +72,10 @@ git commit -m "labels: +N produtos"
 git push
 ```
 
-De vez em quando, para tirar as linhas repetidas (produto salvo mais de uma vez), rode `make compact-labels`: reescreve o arquivo com um rótulo por produto (o mais recente) e junta nele outros arquivos `.jsonl` que existirem na pasta.
+De vez em quando, para tirar as linhas repetidas (produto salvo mais de uma vez), rode `pixi run compact-labels`: reescreve o arquivo com um rótulo por produto (o mais recente) e junta nele outros arquivos `.jsonl` que existirem na pasta.
 
 ## Como os rótulos são usados
 
 - `src/labeling/labels.py`: lê os rótulos (linhas corrompidas são ignoradas com um aviso) e decide o gabarito de cada produto (manual se existir, OFF se não).
-- `python src/evaluation/back.py --split dev`: avaliação do pipeline do verso; `--hand-only` avalia só os produtos rotulados à mão.
-- `make pipeline` (etapa 4): os avisos esperados de cada produto também usam os rótulos manuais.
+- `pixi run eval --split dev`: avaliação do pipeline do verso; `--hand-only` avalia só os produtos rotulados à mão.
+- `pixi run pipeline` (etapa 4): os avisos esperados de cada produto também usam os rótulos manuais.

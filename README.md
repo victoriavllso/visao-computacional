@@ -12,122 +12,109 @@ The project leverages the Open Food Facts product dataset hosted on Hugging Face
 
 ## ⚙️ Prerequisites
 
-- **Python 3.14**
-- **Disk Space**: At least **10–15 GB** of free disk space (the `food.parquet` split is ~7.9 GB).
+- **[pixi](https://pixi.sh)**: installs Python 3.13, Tesseract (with the Portuguese model) and every Python package, at the exact versions in `pixi.lock`. No root needed; works on Linux, macOS (Apple Silicon, 14+) and Windows.
+- **Disk Space**: At least **15 GB** of free disk space (the `food.parquet` split is ~7.9 GB, the images ~5 GB).
 - *(Optional)* A **Hugging Face Account & User Access Token** if you experience rate limits (the dataset is public and can be downloaded without authentication).
 
-This project was tested extensively under Python 3.14. Other versions may work, but are not guaranteed to.
+Install pixi once (see [pixi.sh](https://pixi.sh) for other systems):
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+```
 
 ---
 
 ## ⚡ Quick Start
 
-All entry points are available as `make` targets from the project root:
+Everything runs inside the pixi environment, through `pixi run <task>` (tasks in `pixi.toml`). The `make` targets are shortcuts for the same tasks:
 
 | Command | Description |
 | :--- | :--- |
-| `make setup` | Create `.venv` and install runtime dependencies |
-| `make setup-dev` | Same as above, plus dev tools and pre-commit hooks |
-| `make download` | Download the Open Food Facts dataset |
-| `make pipeline` | Run the full processing pipeline |
-| `make test` | Run the unit tests |
-| `make label` | Open the hand-labeling tool (see [LABELING.md](LABELING.md)) |
-| `make compact-labels` | Merge the hand label files into one, one entry per product |
+| `pixi install` (`make setup`) | Create the environment in `.pixi/` from `pixi.lock` |
+| `make setup-dev` | Same as above, plus black, pre-commit and the git hook |
+| `pixi run download` | Download the Open Food Facts dataset |
+| `pixi run pipeline` | Run the full processing pipeline |
+| `pixi run test` | Run the unit tests |
+| `pixi run eval --split dev --hand-only` | Evaluate the back pipeline (options below) |
+| `pixi run label` | Open the hand-labeling tool (see [LABELING.md](LABELING.md)) |
+| `pixi run compact-labels` | Merge the hand label files into one, one entry per product |
 
 Typical first-time flow:
 
 ```bash
-make setup
-source .venv/bin/activate
-make download
-make pipeline
+pixi install
+pixi run download
+pixi run pipeline
 ```
+
+Other scripts run the same way, e.g. `pixi run python src/evaluation/back.py --help`, or open a shell inside the environment with `pixi shell`.
 
 ---
 
-## 🚀 Environment Setup
+## 🚀 Environment
 
-Run the setup target from the project root:
+`pixi.toml` is the only definition of the environment, and `pixi.lock` pins the exact version of every package (conda and PyPI) for each platform, so every machine runs the same code with the same libraries. The OCR results depend on them: library versions changed the score by several points.
 
-```bash
-# Regular setup (runtime dependencies only)
-make setup
+- Add or update a dependency by editing `pixi.toml` and running `pixi install`, which updates `pixi.lock`; commit both.
+- The environment lives in `.pixi/` (git-ignored); delete it to start over.
 
-# Developer setup (includes black, pre-commit, and git hooks)
-make setup-dev
-```
+### On the UFSC JupyterHub server
 
-The setup script automatically:
-1. Creates a Python virtual environment (`.venv/` at the project root).
-2. Upgrades `pip` to the latest version.
-3. Installs all required packages.
-4. Creates the `data/` directory for the dataset.
-5. *(With `make setup-dev`)* Installs developer tooling and registers the pre-commit git hook.
-
-#### Options (advanced):
-If you need a custom venv location, call the script directly:
-- `--venv-dir <path>`: Specify a custom virtual environment folder (default: `.venv`).
-- `--dev`: Install developer dependencies and set up pre-commit hooks.
+The server can't run containers, but pixi needs no root. Only `~/privado` survives a container restart, so keep pixi and the project there:
 
 ```bash
-# Example with a custom venv directory
-python3 src/setup/setup_env.py --venv-dir ./my-venv
-
-# Developer setup with a custom venv directory
-python3 src/setup/setup_env.py --dev --venv-dir ./my-venv
+cd ~/privado
+curl -fsSL https://pixi.sh/install.sh | PIXI_HOME=~/privado/.pixi PIXI_NO_PATH_UPDATE=1 sh
+export PATH=~/privado/.pixi/bin:$PATH   # in every new terminal
+git clone https://github.com/victoriavllso/visao-computacional.git
+cd visao-computacional
+pixi install && pixi run download && pixi run pipeline
 ```
 
-#### Activate the Virtual Environment:
-After setup finishes, activate the environment in your shell:
-
-```bash
-source .venv/bin/activate
-```
+The machine is shared: pass `--workers` to the evaluation (e.g. `--workers 32`) instead of the default, which uses every core.
 
 ---
 
 ## 📥 Downloading the Dataset
 
-> Ensure your virtual environment is **activated** before downloading so the `hf` CLI tool is available.
-
 ```bash
-make download
+pixi run download
 ```
 
 If the dataset files are already present in `data/product-database/`, the download is skipped automatically.
 
-The dataset is updated daily, so the download is pinned to one snapshot (`HF_REVISION` in `src/utils/constants.py`, 2026-10-18, 2,571 product pairs, with every hand-labeled product): everyone gets the same products. If your copy came from another snapshot, `make download` replaces it; then delete the filtered files and run `make pipeline` again (images already downloaded are kept):
+The dataset is updated daily, so the download is pinned to one snapshot (`HF_REVISION` in `src/utils/constants.py`, 2026-10-18, 2,571 product pairs, with every hand-labeled product): everyone gets the same products. If your copy came from another snapshot, `pixi run download` replaces it; then delete the filtered files and run `pixi run pipeline` again (images already downloaded are kept):
 
 ```bash
 rm -r data/brazil data/brazil_pairs/*.parquet
-make pipeline
+pixi run pipeline
 ```
 
 #### Options (advanced):
-If you need a custom directory or token, call the script directly:
+If you need a custom directory or token, pass the options to the task:
 - `--local-dir <path>`: Destination folder (default: `data/product-database`).
 - `--token <your_hf_token>`: Hugging Face access token (optional, useful for higher API rate limits).
 
 ```bash
 # Example with a custom target directory and token
-python src/ingestion/download_dataset.py --local-dir ./my-data --token hf_xxxxxxxxxxxxxxxxxxxxx
+pixi run download --local-dir ./my-data --token hf_xxxxxxxxxxxxxxxxxxxxx
 ```
 
 ---
 
 ## 🔁 Running the Pipeline
 
-With the dataset downloaded and the virtual environment activated:
+With the dataset downloaded:
 
 ```bash
-make pipeline
+pixi run pipeline
 ```
 
 #### Options (advanced):
 - `--dataset-dir <path>`: Directory containing the raw dataset files (default: `data/product-database`).
 
 ```bash
-python src/pipeline/data_pipeline.py --dataset-dir ./my-data
+pixi run pipeline --dataset-dir ./my-data
 ```
 
 The pipeline runs the following stages in order:
@@ -223,7 +210,7 @@ photo ─► locate ─► almost no text? ────────────�
 **Evaluation** against the ground truth (hand labels where they exist, see [LABELING.md](LABELING.md); Open Food Facts values otherwise):
 
 ```bash
-python src/evaluation/back.py --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug]
+pixi run eval --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug]
 ```
 
 Results are saved to `data/evaluation/back_<split>_<timestamp>_<tag>/` (CSV + Markdown report). Symlinks in `data/evaluation/latest/` (`back_dev.csv`, `back_val.csv` and `.md` reports) always point to the most recent run for each split. Other tools (labeling server, confusion matrix) read from `latest/` by default; pass an explicit path to use a specific run.
@@ -245,41 +232,41 @@ Use `--debug` to save intermediate images and a JSON summary for every product t
 Debug mode runs sequentially (no multiprocessing) for cleaner output. Combine with `--limit` to debug a few products quickly:
 
 ```bash
-python src/evaluation/back.py --split dev --hand-only --limit 5 --debug
+pixi run eval --split dev --hand-only --limit 5 --debug
 ```
 
 Each metric counts only products whose true value or decision is known. Per nutrient: *label* (row found), *found* (value read), *correct* (within 5%), *decision* (same warning decision as the truth). Photos classified as not readable get no values (the pipeline abstains). The report has the photo type confusion matrix against the hand labels and the metrics on three subsets: all photos end-to-end, predicted readable, and **hand-labeled readable** (the unmasked score).
 
 ### Final score: validation set (held out, hand-labeled)
 
-All 395 val products labeled by hand (280 tables, 36 linear, 46 old format, 33 without a readable table). Nothing was tuned on val, so this is the honest estimate:
+All 397 val products labeled by hand (282 tables, 36 linear, 46 old format, 33 without a readable table), on the pinned 2026-10-18 snapshot, measured with the pixi environment. Nothing was tuned on val, so this is the honest estimate:
 
 | | Value |
 | :--- | ---: |
-| **Readable photos with all three warning decisions right** | **57.1%** |
-| Decision right: added sugars / saturated fat / sodium | 76.9% / 73.1% / 79.4% |
-| When the pipeline says "readable": all three right | 58.9% |
-| Photo type accuracy | 81.0% |
-| Readable tables left without an answer | 2 of 280 |
+| **Readable photos with all three warning decisions right** | **71.6%** |
+| Decision right: added sugars / saturated fat / sodium | 85.2% / 81.6% / 82.7% |
+| When the pipeline says "readable": all three right | 73.3% |
+| Photo type accuracy | 81.9% |
+| Readable tables left without an answer | 2 of 282 |
 | Old-format labels wrongly checked as tables | 17 of 46 |
 
-Measured with the classifier from PR #15, on the 2026-10-10 snapshot (before the pin to 2026-10-18, which adds 4 val products and changes one val photo). Before PR #15 the headline was the same, 57.1%: fewer tables go unanswered (7 → 2 of 280), but more old-format labels are checked as tables (14 → 17 of 46), and no photo is classified as linear anymore (28 of 36 read as tables, which is harmless: both are read the same way).
+The learned OCR library made the difference: on the same photos, labels and code, `rapidocr_onnxruntime` 1.2.3 gave 57.1% (dev: 62.8%) and `rapidocr` 3.10 gives 71.6% (dev: 77.4%), +14.5 points. The gain is in reading values (added sugars read right: 62% → 81%); the old library's text detector merged neighboring cells into one number (`338 | 338` → `338338`). Old-format detection is still the weakest point.
 
-About 9 points below dev (66.5%): the decisions made on dev errors fit dev better than new photos. Val also has twice the share of old-format labels (12% vs 6%), and old-format detection is what generalizes worst. Improvements are developed on dev; val is only for checking them at the end.
+Val is about 6 points below dev: the decisions made on dev errors fit dev better than new photos. Val also has far more old-format labels (12%, against 2% in dev), and old-format detection is what generalizes worst. Improvements are developed on dev; val is only for checking them at the end.
 
 ### Results on hand-labeled dev photos (unmasked)
 
-255 dev photos labeled by hand (187 tables, 20 linear, 15 old format, 33 without a readable table):
+929 dev photos labeled by hand (837 tables, 27 linear, 15 old format, 50 without a readable table), same snapshot and environment as val:
 
 | | Value |
 | :--- | ---: |
-| Photo type accuracy | 84.7% |
-| Readable tables wrongly rejected (no answer) | 4 of 187 |
-| Old-format labels wrongly checked as tables | 2 of 15 |
-| Readable photos with all three warning decisions right | **66.5%** |
-| Decision right: added sugars / saturated fat / sodium | 84.1% / 83.5% / 82.5% |
+| Photo type accuracy | 87.0% |
+| Readable tables wrongly rejected (no answer) | 52 of 837 |
+| Old-format labels wrongly checked as tables | 4 of 15 |
+| Readable photos with all three warning decisions right | **77.4%** |
+| Decision right: added sugars / saturated fat / sodium | 88.2% / 84.1% / 80.4% |
 
-Photos with no format evidence even after both OCR engines are treated as old format (abstain): of the 10 such photos, 6 were old format and none of the 3 tables among them was read right. With 176 labels the headline was 68.2%; the difference is within noise.
+Photos with no format evidence even after both OCR engines are treated as old format (abstain).
 
 The OFF-based figures below count unreadable photos (a quarter of them in the hand labels) and OFF errors as failures, so they understate the pipeline.
 

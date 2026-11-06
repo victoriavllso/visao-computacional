@@ -67,7 +67,14 @@ NUTRITION_WORDS = (
 PER_100 = ("por100g", "por100ml", "100g", "100ml", "100gpor", "100mlpor")
 
 # Distinct phrases used in linear/text declarations (e.g. "por 100 g contém...")
-PER_100_EXPLICIT_LINEAR = ("por100g", "por100ml", "em100g", "em100ml", "100gcontem", "100mlcontem")
+PER_100_EXPLICIT_LINEAR = (
+    "por100g",
+    "por100ml",
+    "em100g",
+    "em100ml",
+    "100gcontem",
+    "100mlcontem",
+)
 
 NEW_FORMAT_TEXT = ("acucarestotais", "fornecidospelaporcao", "adicionados")
 OLD_FORMAT_TEXT = ("quantidadeporporcao", "dietade2000", "8400kj")
