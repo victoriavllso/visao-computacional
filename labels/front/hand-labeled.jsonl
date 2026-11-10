@@ -45,7 +45,7 @@
 {"code": "7891025124566", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-08T17:41:05"}
 {"code": "7891025699880", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[411, 433, 110, 138]], "note": null, "saved_at": "2026-11-08T17:42:19"}
 {"code": "7891030300207", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[360, 35, 148, 123]], "note": null, "saved_at": "2026-11-08T17:42:31"}
-{"code": "7891095031122", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[417, 204, 177, 59]], "note": "Visibilidade parcial do aviso.", "saved_at": "2026-11-08T17:43:33"}
+{"code": "7891095031122", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[417, 204, 177, 59]], "note": "Visibilidade parcial do aviso", "saved_at": "2026-11-08T17:43:33"}
 {"code": "7891095910939", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-08T17:43:42"}
 {"code": "7891097000270", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-08T17:43:55"}
 {"code": "7891097000270", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-08T17:44:03"}
@@ -479,3 +479,108 @@
 {"code": "7894854600034", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T11:35:47"}
 {"code": "7891167021020", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T11:35:50"}
 {"code": "7891515598259", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": true, "boxes": [[981, 406, 1166, 223]], "note": null, "saved_at": "2026-11-10T11:36:12"}
+{"code": "7896200024006", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": true, "boxes": [[2692, 1100, 584, 79]], "note": null, "saved_at": "2026-11-10T13:42:37"}
+{"code": "7898634263891", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:42:41"}
+{"code": "7896256601848", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:42:42"}
+{"code": "7896275970611", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:42:44"}
+{"code": "7898942775321", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:42:47"}
+{"code": "7896025805637", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": true, "boxes": [[174, 240, 64, 17]], "note": null, "saved_at": "2026-11-10T13:43:20"}
+{"code": "7622300847791", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:22"}
+{"code": "7896102000122", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:23"}
+{"code": "7898967062000", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:24"}
+{"code": "7896256040456", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:26"}
+{"code": "7898952041737", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:28"}
+{"code": "8480017069528", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:29"}
+{"code": "8480017069528", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:32"}
+{"code": "7899759407542", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:43:35"}
+{"code": "7896102583182", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[167, 551, 197, 63]], "note": null, "saved_at": "2026-11-10T13:43:49"}
+{"code": "7896102503715", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": true, "boxes": [[410, 784, 351, 102]], "note": null, "saved_at": "2026-11-10T13:44:00"}
+{"code": "7622210567567", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[881, 35, 148, 132]], "note": null, "saved_at": "2026-11-10T13:44:14"}
+{"code": "7891079000434", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:44:17"}
+{"code": "7896232800883", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[902, 35, 261, 290]], "note": null, "saved_at": "2026-11-10T13:44:34"}
+{"code": "7896991770502", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:44:35"}
+{"code": "7896202810782", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[355, 1318, 207, 361]], "note": null, "saved_at": "2026-11-10T13:44:52"}
+{"code": "7899542000134", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[261, 562, 438, 122]], "note": null, "saved_at": "2026-11-10T13:45:01"}
+{"code": "7899916905645", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:03"}
+{"code": "0751320341617", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:04"}
+{"code": "7899930901340", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[248, 313, 147, 131]], "note": null, "saved_at": "2026-11-10T13:45:12"}
+{"code": "2009970003682", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:14"}
+{"code": "7891000379585", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:17"}
+{"code": "7898064016210", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:19"}
+{"code": "7894904769858", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:21"}
+{"code": "7891008137347", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[578, 3, 135, 156]], "note": null, "saved_at": "2026-11-10T13:45:29"}
+{"code": "7891527068108", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:32"}
+{"code": "7895000515943", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:34"}
+{"code": "7892840815783", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:35"}
+{"code": "7898279710910", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[2368, 1085, 405, 324]], "note": null, "saved_at": "2026-11-10T13:45:44"}
+{"code": "7898279710910", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[2368, 1085, 405, 324]], "note": null, "saved_at": "2026-11-10T13:45:48"}
+{"code": "7898196550279", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:50"}
+{"code": "7898953148701", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:51"}
+{"code": "7892840818357", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:52"}
+{"code": "0896462621828", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:54"}
+{"code": "7896590802123", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:55"}
+{"code": "7896594971283", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:57"}
+{"code": "7896050201749", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:45:58"}
+{"code": "0896986232213", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[1379, 46, 495, 595]], "note": null, "saved_at": "2026-11-10T13:46:08"}
+{"code": "7896411800208", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[832, 1743, 182, 305]], "note": null, "saved_at": "2026-11-10T13:46:22"}
+{"code": "7898215152019", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[1765, 848, 327, 273]], "note": null, "saved_at": "2026-11-10T13:46:30"}
+{"code": "7898637354671", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:46:33"}
+{"code": "0793573955586", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[28, 36, 399, 366]], "note": null, "saved_at": "2026-11-10T13:46:44"}
+{"code": "7894900010398", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[1160, 480, 688, 429]], "note": "Visibilidade parcial do aviso", "saved_at": "2026-11-10T13:47:13"}
+{"code": "7891030003016", "status": "not_front", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:47:26"}
+{"code": "7908271307237", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:47:33"}
+{"code": "7896051164142", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:47:35"}
+{"code": "7897951610395", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:47:37"}
+{"code": "7891095911486", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:47:44"}
+{"code": "7898019061425", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:47:47"}
+{"code": "2525110001719", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:48:04"}
+{"code": "7898307170570", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": true, "boxes": [[1160, 1955, 737, 327]], "note": null, "saved_at": "2026-11-10T13:48:18"}
+{"code": "7895000528776", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[707, 131, 748, 214]], "note": null, "saved_at": "2026-11-10T13:48:28"}
+{"code": "7622210573353", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[437, 236, 59, 60]], "note": null, "saved_at": "2026-11-10T13:48:43"}
+{"code": "7896058259520", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[1501, 56, 1428, 234]], "note": null, "saved_at": "2026-11-10T13:58:09"}
+{"code": "7895000536160", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:12"}
+{"code": "7898923217031", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:15"}
+{"code": "7898924049501", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:16"}
+{"code": "7898949878131", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:21"}
+{"code": "7898206500027", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:24"}
+{"code": "7898270967313", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:26"}
+{"code": "7897714901128", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:33"}
+{"code": "7892840815271", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:35"}
+{"code": "7898568900916", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:38"}
+{"code": "7896256603446", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:40"}
+{"code": "7898059340405", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:58:44"}
+{"code": "7898934982683", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[860, 244, 1146, 234]], "note": null, "saved_at": "2026-11-10T13:58:59"}
+{"code": "7898215151784", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[634, 99, 142, 129]], "note": null, "saved_at": "2026-11-10T13:59:12"}
+{"code": "7896295384566", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:59:14"}
+{"code": "7891008121629", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[465, 314, 128, 161]], "note": null, "saved_at": "2026-11-10T13:59:51"}
+{"code": "7896807416891", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T13:59:54"}
+{"code": "7891008121629", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[465, 314, 128, 161]], "note": null, "saved_at": "2026-11-10T14:00:02"}
+{"code": "7898644310554", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[851, 73, 619, 162]], "note": null, "saved_at": "2026-11-10T14:00:19"}
+{"code": "7896625210275", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:21"}
+{"code": "7896066301464", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:23"}
+{"code": "7896228100706", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:25"}
+{"code": "7891000061367", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:26"}
+{"code": "7896256600551", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:29"}
+{"code": "7896353300019", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:30"}
+{"code": "20023960025812509240", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:35"}
+{"code": "7893189882825", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:37"}
+{"code": "7896625211395", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:39"}
+{"code": "7898483533640", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:41"}
+{"code": "7898215152811", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:43"}
+{"code": "7891000402931", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[1001, 487, 92, 109]], "note": null, "saved_at": "2026-11-10T14:00:53"}
+{"code": "7896024210463", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:55"}
+{"code": "7899659901089", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:57"}
+{"code": "7898568901043", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:00:59"}
+{"code": "7898701303277", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[2042, 119, 482, 313]], "note": null, "saved_at": "2026-11-10T14:01:11"}
+{"code": "7898377662050", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:01:14"}
+{"code": "7896894900013", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:01:17"}
+{"code": "7898227280618", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:01:19"}
+{"code": "7898116950660", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:01:25"}
+{"code": "7896181711827", "status": "ok", "added_sugars": false, "saturated_fat": true, "sodium": false, "boxes": [[105, 530, 112, 405]], "note": "Visibilidade parcial do aviso", "saved_at": "2026-11-10T14:02:13"}
+{"code": "7894900180541", "status": "ok", "added_sugars": true, "saturated_fat": false, "sodium": false, "boxes": [[1079, 1974, 169, 270]], "note": null, "saved_at": "2026-11-10T14:02:35"}
+{"code": "7891823929318", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[372, 480, 408, 91]], "note": null, "saved_at": "2026-11-10T14:03:05"}
+{"code": "7896066301778", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:03:08"}
+{"code": "7896036000793", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:03:11"}
+{"code": "7891097104404", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:03:13"}
+{"code": "7898952831123", "status": "ok", "added_sugars": false, "saturated_fat": false, "sodium": false, "boxes": [], "note": null, "saved_at": "2026-11-10T14:03:16"}
+{"code": "7891000361214", "status": "ok", "added_sugars": true, "saturated_fat": true, "sodium": false, "boxes": [[187, 176, 109, 81]], "note": null, "saved_at": "2026-11-10T14:03:41"}
