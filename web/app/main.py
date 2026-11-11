@@ -31,10 +31,13 @@ def index():
 
 
 def with_photos(entry: dict) -> dict:
+    """Links to the photos the analysis has (no front when only the table
+    was checked)."""
     base = f"/api/analyses/{entry['id']}/photos"
     entry["photos"] = {
         side: {variant: f"{base}/{side}/{variant}" for variant in ("view", "thumb")}
         for side in storage.SIDES
+        if entry["extensions"].get(side)
     }
     return entry
 
@@ -64,13 +67,24 @@ def store_photos(analysis_id: str, uploads: dict) -> dict:
 # Plain `def`: FastAPI runs it in a thread pool, so a slow pipeline doesn't
 # block the other requests.
 @app.post("/api/analyses", status_code=201)
-def create_analysis(front: UploadFile, back: UploadFile, name: str = Form("")):
-    uploads = {"front": read_upload(front, "front"), "back": read_upload(back, "back")}
+def create_analysis(
+    back: UploadFile, front: UploadFile | None = None, name: str = Form("")
+):
+    """Without the front photo, only the table is read: the result says which
+    warnings the product must carry ("info"), not whether it complies."""
+    uploads = {"back": read_upload(back, "back")}
+    if front is not None:
+        uploads["front"] = read_upload(front, "front")
     analysis_id = storage.new_id()
     try:
         extensions = store_photos(analysis_id, uploads)
+        front_path = (
+            storage.photo_path(analysis_id, "front", "original", extensions["front"])
+            if "front" in extensions
+            else None
+        )
         result = pipeline.analyze(
-            storage.photo_path(analysis_id, "front", "original", extensions["front"]),
+            front_path,
             storage.photo_path(analysis_id, "back", "original", extensions["back"]),
         )
         entry = storage.save(analysis_id, name.strip()[:120], extensions, result)

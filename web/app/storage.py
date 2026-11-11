@@ -71,7 +71,7 @@ def save(analysis_id: str, name: str, extensions: dict, result: dict) -> dict:
                 created_at,
                 name,
                 result["verdict"],
-                extensions["front"],
+                extensions.get("front", ""),  # "": table only, no front photo
                 extensions["back"],
                 json.dumps(result, ensure_ascii=False),
             ),

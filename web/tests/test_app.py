@@ -192,3 +192,67 @@ def test_summarize_unreadable_back_is_inconclusive():
 def test_summarize_all_match_is_compliant():
     required = {"added_sugars": True, "saturated_fat": False, "sodium": True}
     assert pipeline.summarize(readings(required, dict(required)))[0] == "compliant"
+
+
+def upload_table_only(client, back=None, name="Suco"):
+    files = {"back": ("verso.jpg", back or jpeg(2), "image/jpeg")}
+    return client.post("/api/analyses", files=files, data={"name": name})
+
+
+def test_table_only_gives_info_without_a_front(client, monkeypatch):
+    monkeypatch.setenv("APP_MOCK_VERDICT", "compliant")
+    response = upload_table_only(client)
+    assert response.status_code == 201
+    entry = response.json()
+    result = entry["result"]
+    assert result["mode"] == "table_only"
+    assert result["verdict"] == "info"
+    assert set(result["found_warnings"].values()) == {None}
+    assert set(entry["photos"]) == {"back"}
+    assert (
+        client.get(f"/api/analyses/{entry['id']}/photos/front/thumb").status_code == 404
+    )
+
+    listed = client.get("/api/analyses").json()[0]
+    assert listed["verdict"] == "info" and set(listed["photos"]) == {"back"}
+
+
+def test_full_mode_still_needs_the_back(client):
+    files = {"front": ("frente.jpg", jpeg(1), "image/jpeg")}
+    assert client.post("/api/analyses", files=files).status_code == 422
+
+
+def table_readings(required, found, basis="100g", table_only=False):
+    return pipeline.Readings(
+        {"basis": basis},
+        dict(zip(pipeline.NUTRIENTS, required)),
+        dict(zip(pipeline.NUTRIENTS, found)),
+        "table",
+        {},
+        table_only=table_only,
+    )
+
+
+def test_info_reasons_list_the_required_warnings():
+    r = table_readings((True, False, None), (None, None, None), table_only=True)
+    verdict, reasons = pipeline.summarize(r)
+    assert verdict == "info"
+    assert reasons == [
+        "Deve ter o alerta ALTO EM AÇÚCAR ADICIONADO.",
+        "Não foi possível ler o valor para decidir ALTO EM SÓDIO.",
+    ]
+    nothing = table_readings((False,) * 3, (None,) * 3, table_only=True)
+    assert pipeline.summarize(nothing)[1] == ["Não precisa de nenhum alerta “ALTO EM”."]
+
+
+def test_notes_explain_solid_or_liquid_limits_on_violations():
+    liquid = table_readings((True, False, False), (False, False, False), basis="100ml")
+    notes = pipeline.notes(liquid, "non_compliant")
+    assert "líquido" in notes[0] and "7,5 g" in notes[0] and "100 ml" in notes[0]
+    assert "Anexo XVI" in notes[1]
+    # No notes when nothing is wrong or required.
+    fine = table_readings((False,) * 3, (False,) * 3)
+    assert pipeline.notes(fine, "compliant") == []
+    # Table only: notes when a warning is required.
+    info = table_readings((False, False, True), (None,) * 3, table_only=True)
+    assert "sólido" in pipeline.notes(info, "info")[0]

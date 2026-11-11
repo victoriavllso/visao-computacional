@@ -14,6 +14,19 @@ const VERDICTS = {
   compliant: { title: "De acordo com a ANVISA", short: "De acordo" },
   inconclusive: { title: "Não foi possível decidir", short: "Inconclusivo" },
   non_compliant: { title: "Viola as regras da ANVISA", short: "Viola as regras" },
+  // Table only: what the front must show, not a compliance decision.
+  info: { title: "Alertas exigidos pela tabela", short: "Só a tabela" },
+};
+
+const MODES = {
+  full: {
+    lead: "Envie uma foto da <strong>frente</strong> da embalagem e uma do <strong>verso</strong>, com a tabela nutricional legível.",
+    hint: "Escolha as duas fotos para continuar.",
+  },
+  table_only: {
+    lead: "Envie uma foto do <strong>verso</strong>, com a tabela nutricional legível: o resultado mostra quais alertas a frente deve ter.",
+    hint: "Escolha a foto do verso para continuar.",
+  },
 };
 
 const PHOTO_TYPES = {
@@ -29,6 +42,7 @@ const ICONS = {
   compliant: '<circle cx="12" cy="12" r="10"/><path d="M7 12.5l3.2 3.2L17 9"/>',
   inconclusive: '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   non_compliant: '<circle cx="12" cy="12" r="10"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7.5v.01"/>',
   yes: '<path d="M5 12.5l4.5 4.5L19 7"/>',
   no: '<path d="M6 12h12"/>',
   unknown: '<path d="M9.2 9a3 3 0 1 1 3.8 2.9c-.6.2-1 .8-1 1.4V14M12 17.5v.01"/>',
@@ -107,6 +121,23 @@ let routed = false;
 // ------------------------------------------------------------- Upload ---
 
 const chosen = { front: null, back: null };
+let mode = "full";
+
+function setMode(value) {
+  mode = value;
+  const tableOnly = mode === "table_only";
+  $('.slot[data-side="front"]').hidden = tableOnly;
+  $(".slots").classList.toggle("single", tableOnly);
+  $("#analyze-lead").innerHTML = MODES[mode].lead;
+  $("#analyze-hint").textContent = MODES[mode].hint;
+  updateReady();
+}
+
+function updateReady() {
+  const ready = chosen.back && (mode === "table_only" || chosen.front);
+  $("#analyze-submit").disabled = !ready;
+  $("#analyze-hint").hidden = Boolean(ready);
+}
 
 function setPhoto(side, file) {
   const slot = $(`.slot[data-side="${side}"]`);
@@ -122,23 +153,26 @@ function setPhoto(side, file) {
   preview.dataset.empty = String(!file);
   if (file) img.src = URL.createObjectURL(file);
   else img.removeAttribute("src");
-  const ready = chosen.front && chosen.back;
-  $("#analyze-submit").disabled = !ready;
-  $("#analyze-hint").hidden = Boolean(ready);
+  updateReady();
 }
 
 function resetForm() {
+  // Keep the chosen mode: someone checking tables checks several.
+  const current = mode;
   $("#analyze-form").reset();
+  $(`input[name="mode"][value="${current}"]`).checked = true;
   setPhoto("front", null);
   setPhoto("back", null);
+  setMode(current);
   $("#analyze-error").hidden = true;
 }
 
 async function submitAnalysis(event) {
   event.preventDefault();
-  if (!chosen.front || !chosen.back) return;
+  const tableOnly = mode === "table_only";
+  if (!chosen.back || (!tableOnly && !chosen.front)) return;
   const form = new FormData();
-  form.append("front", chosen.front);
+  if (!tableOnly) form.append("front", chosen.front);
   form.append("back", chosen.back);
   form.append("name", $('input[name="name"]').value);
   $("#analyze-error").hidden = true;
@@ -164,18 +198,20 @@ function flag(value, labels) {
 }
 
 function warningsTable(result) {
+  // Table only: there's no front to compare with.
+  const withFront = result.mode !== "table_only";
   const rows = NUTRIENTS.map(({ key, warning }) => {
     const required = result.required_warnings[key];
     const found = result.found_warnings[key];
-    const mismatch = typeof required === "boolean" && typeof found === "boolean" && required !== found;
+    const mismatch = withFront && typeof required === "boolean" && typeof found === "boolean" && required !== found;
     return `<tr class="${mismatch ? "mismatch" : ""}">
       <th scope="row">${warning}${mismatch ? '<span class="visually-hidden"> (divergente)</span>' : ""}</th>
       <td>${flag(required, ["Exigido", "Não exigido", "Indefinido"])}</td>
-      <td>${flag(found, ["Presente", "Ausente", "Não lido"])}</td>
+      ${withFront ? `<td>${flag(found, ["Presente", "Ausente", "Não lido"])}</td>` : ""}
     </tr>`;
   }).join("");
   return `<div class="table-wrap"><table>
-    <thead><tr><th scope="col">Alerta</th><th scope="col">Pelas regras</th><th scope="col">Na frente</th></tr></thead>
+    <thead><tr><th scope="col">Alerta</th><th scope="col">Pelas regras</th>${withFront ? '<th scope="col">Na frente</th>' : ""}</tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
 
@@ -225,10 +261,15 @@ function renderResult(entry) {
       ${nutritionTable(result)}
     </section>
 
+    ${result.notes?.length ? `<section class="card notes" aria-labelledby="notes-title">
+      <h2 id="notes-title">Sobre os limites</h2>
+      ${result.notes.map((note) => `<p>${esc(note)}</p>`).join("")}
+    </section>` : ""}
+
     <section class="card" aria-labelledby="photos-title">
       <h2 id="photos-title">Fotos enviadas</h2>
       <div class="photos">
-        ${["front", "back"].map((side) => `<figure>
+        ${["front", "back"].filter((side) => photos[side]).map((side) => `<figure>
           <a href="${photos[side].view}" target="_blank" rel="noopener">
             <img src="${photos[side].view}" alt="Foto da ${side === "front" ? "frente" : "verso"} de ${esc(name)}" loading="lazy">
           </a>
@@ -258,8 +299,8 @@ function renderHistory(entries) {
     const name = entry.name || "Produto sem nome";
     return `<li class="history-item">
       <div class="thumbs">
-        <img src="${entry.photos.front.thumb}" alt="" loading="lazy">
-        <img src="${entry.photos.back.thumb}" alt="" loading="lazy">
+        ${["front", "back"].filter((side) => entry.photos[side]).map((side) =>
+          `<img src="${entry.photos[side].thumb}" alt="" loading="lazy">`).join("")}
       </div>
       <div class="history-main">
         <a href="#/analise/${entry.id}">${esc(name)}</a>
@@ -340,6 +381,10 @@ document.addEventListener("DOMContentLoaded", () => {
       setPhoto(input.name, file);
     });
   }
+  for (const radio of document.querySelectorAll('input[name="mode"]')) {
+    radio.addEventListener("change", () => setMode(radio.value));
+  }
+  setMode($('input[name="mode"]:checked').value);
   $("#analyze-form").addEventListener("submit", submitAnalysis);
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-delete]");

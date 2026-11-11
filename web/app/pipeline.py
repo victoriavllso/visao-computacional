@@ -3,6 +3,9 @@ backend calls to analyze a product.
 
     analyze(front_path, back_path) -> dict
 
+front_path None: only the nutrition table is read, and the verdict is "info"
+(which warnings the product must carry) instead of a compliance decision.
+
 `read_photos` runs the real pipelines: back (nutrition table) → rules
 (required warnings) → front (printed warnings). The front uses YOLO + OCR when
 the detector weights (models/front_detector.onnx) are there, OCR on the whole
@@ -16,7 +19,8 @@ non_compliant forces a verdict.
 Returned structure (also what the JSON export contains, under "result"):
 
     {
-      "verdict": "compliant" | "inconclusive" | "non_compliant",
+      "mode": "full" | "table_only",
+      "verdict": "compliant" | "inconclusive" | "non_compliant" | "info",
       "reasons": [str, ...],          # plain Portuguese, shown to the user
       "nutrition": {                  # per 100 g or 100 ml, as sold
         "basis": "100g" | "100ml" | None,
@@ -27,7 +31,9 @@ Returned structure (also what the JSON export contains, under "result"):
       "required_warnings": {"added_sugars": bool | None,   # None: undecidable
                             "saturated_fat": bool | None,
                             "sodium": bool | None},
-      "found_warnings": {...same keys...},                  # None: unreadable
+      "found_warnings": {...same keys...},  # None: unreadable or no front
+      "notes": [str, ...],  # when a warning is required: limits for solid or
+                            # liquid foods, and the exempt categories
       "back_photo_type": "table" | "linear" | "old_format" | "no_table"
                          | "uncertain",
       "versions": {"back": str, "front": str, "rules": str},
@@ -69,8 +75,34 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT / "src") not in sys.path:
     sys.path.append(str(REPO_ROOT / "src"))
 
+from rules.anvisa import LIMITS as RULE_LIMITS  # noqa: E402 (needs src/)
+
 NUTRIENTS = ("added_sugars", "saturated_fat", "sodium")
-VERDICTS = ("compliant", "inconclusive", "non_compliant")
+VERDICTS = ("compliant", "inconclusive", "non_compliant")  # with the front
+
+# IN 75/2020 Annex XV, keyed like the rest of the app: {"100g": {"sodium":
+# 600, ...}, "100ml": {...}}; sugars and fat in g, sodium in mg.
+LIMITS = {
+    basis.value: {nutrient.value: limit for nutrient, limit in limits.items()}
+    for basis, limits in RULE_LIMITS.items()
+}
+FOOD_KIND = {
+    "100g": "alimento sólido ou semissólido (tabela por 100 g)",
+    "100ml": "alimento líquido (tabela por 100 ml)",
+}
+# The app doesn't ask for the category (a hindrance to the user): instead,
+# when a warning is required, it lists the categories that change that
+# (IN 75/2020 Annex XVI).
+EXEMPTIONS_NOTE = (
+    "Algumas categorias não seguem esta regra (IN 75/2020, Anexo XVI). "
+    "Nunca levam o alerta: leites, azeite e óleos vegetais, sal, fórmulas "
+    "infantis e enterais, alimentos para controle de peso, suplementos, "
+    "bebidas alcoólicas e aditivos (como adoçantes de mesa). Só levam se um "
+    "ingrediente adicionado trouxer o nutriente: frutas, hortaliças, "
+    "leguminosas, cereais, castanhas, sementes, cogumelos, farinhas, carnes e "
+    "peixes embalados, ovos, leites fermentados e queijos. Se o produto for "
+    "de uma dessas categorias, o resultado pode não se aplicar."
+)
 
 WARNING_TEXT = {
     "added_sugars": "ALTO EM AÇÚCAR ADICIONADO",
@@ -97,18 +129,22 @@ class Readings:
     photo_type: str
     versions: dict
     mock: bool = False
+    table_only: bool = False  # no front photo: found is all None
 
 
-def analyze(front_path: Path, back_path: Path) -> dict:
+def analyze(front_path: Path | None, back_path: Path) -> dict:
+    front_path = Path(front_path) if front_path is not None else None
     if os.environ.get("APP_PIPELINE") == "mock":
-        readings = read_mock(Path(front_path), Path(back_path))
+        readings = read_mock(front_path, Path(back_path))
     else:
         with _PIPELINE_LOCK:
-            readings = read_photos(Path(front_path), Path(back_path))
+            readings = read_photos(front_path, Path(back_path))
     verdict, reasons = summarize(readings)
     return {
+        "mode": "table_only" if readings.table_only else "full",
         "verdict": verdict,
         "reasons": reasons,
+        "notes": notes(readings, verdict),
         "nutrition": readings.nutrition,
         "required_warnings": readings.required,
         "found_warnings": readings.found,
@@ -122,6 +158,8 @@ def summarize(readings: Readings) -> tuple[str, list[str]]:
     """Verdict and the reasons behind it. Any definite mismatch is a
     violation even when other nutrients are undecidable: the product is
     already wrong."""
+    if readings.table_only:
+        return "info", required_reasons(readings)
     if readings.photo_type in PHOTO_TYPE_REASON:
         return "inconclusive", [PHOTO_TYPE_REASON[readings.photo_type]]
 
@@ -147,6 +185,54 @@ def summarize(readings: Readings) -> tuple[str, list[str]]:
     return "compliant", ["Nenhum alerta é exigido e nenhum foi impresso."]
 
 
+def required_reasons(readings: Readings) -> list[str]:
+    """What the table says the front must show, for the table-only mode."""
+    if readings.photo_type in PHOTO_TYPE_REASON:
+        return [PHOTO_TYPE_REASON[readings.photo_type]]
+    reasons = []
+    for nutrient in NUTRIENTS:
+        required, text = readings.required[nutrient], WARNING_TEXT[nutrient]
+        if required:
+            reasons.append(f"Deve ter o alerta {text}.")
+        elif required is None:
+            reasons.append(f"Não foi possível ler o valor para decidir {text}.")
+    return reasons or ["Não precisa de nenhum alerta “ALTO EM”."]
+
+
+def notes(readings: Readings, verdict: str) -> list[str]:
+    """When a warning is required, or a violation was found: which limits
+    applied (solid or liquid food), and the categories exempt from them."""
+    required = any(readings.required.values())
+    if verdict != "non_compliant" and not (verdict == "info" and required):
+        return []
+    basis = readings.nutrition.get("basis")
+    if basis in FOOD_KIND:
+        kind = (
+            f"O produto foi tratado como {FOOD_KIND[basis]}: o alerta é "
+            f"exigido a partir de {_limits_text(LIMITS[basis])} por "
+            f"{basis.replace('100', '100 ')}."
+        )
+    else:
+        kind = (
+            "Não foi possível saber pela tabela se o alimento é sólido ou "
+            "líquido. Limites: por 100 g (sólidos e semissólidos) "
+            + _limits_text(LIMITS["100g"])
+            + "; por 100 ml (líquidos) "
+            + _limits_text(LIMITS["100ml"])
+            + "."
+        )
+    return [kind, EXEMPTIONS_NOTE]
+
+
+def _limits_text(limits):
+    number = lambda value: f"{value:g}".replace(".", ",")  # noqa: E731
+    return (
+        f"{number(limits['added_sugars'])} g de açúcares adicionados, "
+        f"{number(limits['saturated_fat'])} g de gorduras saturadas ou "
+        f"{number(limits['sodium'])} mg de sódio"
+    )
+
+
 # The OCR engines and the detector are module-level singletons, not meant
 # for concurrent calls: one analysis at a time.
 _PIPELINE_LOCK = threading.Lock()
@@ -161,7 +247,7 @@ def front_method():
     return "yolo" if MODEL_PATH.exists() else "ocr"
 
 
-def read_photos(front_path: Path, back_path: Path) -> Readings:
+def read_photos(front_path: Path | None, back_path: Path) -> Readings:
     """The real pipelines. Heavy imports (OCR models, detector) happen here,
     at the first analysis, and stay loaded."""
     import cv2
@@ -190,17 +276,22 @@ def read_photos(front_path: Path, back_path: Path) -> Readings:
     else:
         required = {n.value: None for n in Nutrient}
 
+    versions = {
+        "back": f"locate + Tesseract/RapidOCR ({ENGINE})",
+        "rules": "IN 75/2020, Anexo XV",
+    }
+    if front_path is None:
+        found = {n.value: None for n in Nutrient}
+        return Readings(
+            nutrition, required, found, back.photo_type.value, versions, table_only=True
+        )
+
     method = front_method()
     front = read_front(_imread(front_path), method=method)
     found = {n.value: bool(present) for n, present in front.warnings.items()}
     if front.boxes and not front.has_warning:
         found = {n: None for n in found}
-
-    versions = {
-        "back": f"locate + Tesseract/RapidOCR ({ENGINE})",
-        "front": "YOLO + OCR" if method == "yolo" else "OCR",
-        "rules": "IN 75/2020, Anexo XV",
-    }
+    versions["front"] = "YOLO + OCR" if method == "yolo" else "OCR"
     return Readings(nutrition, required, found, back.photo_type.value, versions)
 
 
@@ -222,9 +313,10 @@ MOCK_LIMITS = {"added_sugars": 15.0, "saturated_fat": 6.0, "sodium": 600.0}
 MOCK_VERSIONS = {"back": "mock", "front": "mock", "rules": "mock"}
 
 
-def read_mock(front_path: Path, back_path: Path) -> Readings:
+def read_mock(front_path: Path | None, back_path: Path) -> Readings:
     """MOCK: deterministic fake readings derived from the files' bytes."""
-    digest = hashlib.sha256(front_path.read_bytes() + back_path.read_bytes())
+    front_bytes = front_path.read_bytes() if front_path else b""
+    digest = hashlib.sha256(front_bytes + back_path.read_bytes())
     seed = digest.digest()
     forced = os.environ.get("APP_MOCK_VERDICT")
     verdict = forced if forced in VERDICTS else VERDICTS[seed[0] % 3]
@@ -257,4 +349,14 @@ def read_mock(front_path: Path, back_path: Path) -> Readings:
             nutrition["sodium_mg"] = None
             required["sodium"] = None
 
-    return Readings(nutrition, required, found, photo_type, MOCK_VERSIONS, mock=True)
+    if front_path is None:
+        found = {n: None for n in NUTRIENTS}
+    return Readings(
+        nutrition,
+        required,
+        found,
+        photo_type,
+        MOCK_VERSIONS,
+        mock=True,
+        table_only=front_path is None,
+    )

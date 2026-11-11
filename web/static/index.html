@@ -35,10 +35,23 @@
     <!-- New analysis -->
     <section id="view-analyze" class="view" hidden aria-labelledby="analyze-title">
       <h1 id="analyze-title">Analisar produto</h1>
-      <p class="lead">Envie uma foto da <strong>frente</strong> da embalagem e uma do
-        <strong>verso</strong>, com a tabela nutricional legível.</p>
-
       <form id="analyze-form" novalidate>
+        <fieldset class="mode">
+          <legend class="visually-hidden">O que analisar</legend>
+          <label>
+            <input type="radio" name="mode" value="full" checked>
+            <span><strong>Frente e verso</strong>
+              <span class="muted">Confere se o produto está de acordo com a ANVISA.</span></span>
+          </label>
+          <label>
+            <input type="radio" name="mode" value="table_only">
+            <span><strong>Só a tabela nutricional</strong>
+              <span class="muted">Mostra quais alertas “ALTO EM” o produto deve ter.</span></span>
+          </label>
+        </fieldset>
+
+        <p class="lead" id="analyze-lead"></p>
+
         <div class="slots">
           <fieldset class="slot" data-side="front">
             <legend>Frente da embalagem</legend>
