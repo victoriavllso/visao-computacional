@@ -14,8 +14,9 @@ The result shows the reasons, the warnings required vs printed, the nutrition
 table read from the back photo, the photos, and a JSON export. Past analyses
 stay in the **Histórico**, where they can be reopened or deleted.
 
-> **The readings are a mock for now** (see below): the interface works end to
-> end, but the verdicts and values are made up until the pipelines are plugged in.
+The analysis runs the project's pipelines (see "Pipelines" below): a few
+seconds per product on a laptop CPU, the first one slower while the models
+load.
 
 ## Running
 
@@ -39,7 +40,7 @@ camera button on phones; on desktop both buttons open the file picker.
 | File | Role |
 | :--- | :--- |
 | `app/main.py` | FastAPI app: the page and the JSON API |
-| `app/pipeline.py` | **Adapter to the vision pipelines** (mock for now) |
+| `app/pipeline.py` | **Adapter to the vision pipelines** (and a mock for tests) |
 | `app/storage.py` | History in SQLite, photos on disk |
 | `app/images.py` | Upload checks (JPEG/PNG/WebP by content, 20 MB), smaller copies |
 | `static/` | The page: plain HTML/CSS/JS, no build step |
@@ -71,27 +72,26 @@ returns:
 }
 ```
 
-`None` means "couldn't tell". The verdict and the reasons come from
-`summarize()`, which is real code; only `read_photos()` is a mock. It makes
-up the readings from a hash of the two photos (the same photos always give
-the same result, and different ones cover the three verdicts); set
-`APP_MOCK_VERDICT=compliant|inconclusive|non_compliant` to force one.
+`None` means "couldn't tell". `read_photos()` runs the pipelines and
+`summarize()` turns required vs found into the verdict and its reasons:
 
-To plug the real pipelines in, replace `read_photos()` so that it returns a
-`Readings` built from:
+- **back**: `vision.back.pipeline.read_back` → photo type and the nutrition
+  table per 100 g/ml (none when the photo isn't a new-format table: old
+  format, no table);
+- **rules**: `rules.anvisa.assess(facts, Exemption.NONE)` → required
+  warnings (True / False / None when a value couldn't be read). The app
+  doesn't ask for the product category yet, so no exemption is assumed;
+- **front**: `vision.front.warnings.read_front` → printed warnings. It uses
+  YOLO + OCR when `models/front_detector.onnx` is there, OCR on the whole
+  photo otherwise; `APP_FRONT_METHOD=ocr|yolo` forces one. A panel found with
+  no nutrient read counts as "couldn't tell", not as "no warning".
 
-- **back**: `vision.back.pipeline.read_back(cv2.imread(back_path))` →
-  `result.reading.facts` (basis, added_sugars_g, saturated_fat_g, sodium_mg)
-  and `result.photo_type.value`;
-- **rules**: `rules.anvisa.assess(facts, Exemption.NONE)` → a nutrient in
-  `required` is True, in `unknown` None, otherwise False (all None when the
-  back photo isn't readable);
-- **front** (`src/vision/front/`, in progress on another branch): True/False
-  per warning printed, None when it can't tell.
+Analyses run one at a time (the OCR models aren't shared across threads).
 
-The docstring of `app/pipeline.py` has the details (exemptions, imports).
-Set `mock=False` and real versions, so the page stops showing the "resultado
-simulado" notice.
+`APP_PIPELINE=mock` replaces the readings with made-up ones derived from a
+hash of the two photos (instant; the app's tests use it), and the page shows
+a "resultado simulado" notice; `APP_MOCK_VERDICT=compliant|inconclusive|
+non_compliant` then forces a verdict.
 
 ## Known limitations
 

@@ -3,10 +3,15 @@ backend calls to analyze a product.
 
     analyze(front_path, back_path) -> dict
 
-!!! MOCK !!! The readings below are FAKE: `read_photos` makes up the
-nutrition table and the printed warnings from a hash of the two files, so
-every verdict can be seen in the interface before the pipelines are plugged
-in. Set APP_MOCK_VERDICT=compliant|inconclusive|non_compliant to force one.
+`read_photos` runs the real pipelines: back (nutrition table) → rules
+(required warnings) → front (printed warnings). The front uses YOLO + OCR when
+the detector weights (models/front_detector.onnx) are there, OCR on the whole
+photo otherwise; APP_FRONT_METHOD=ocr|yolo forces one.
+
+APP_PIPELINE=mock switches to `read_mock`, which makes up the readings from a
+hash of the two files (fast; used by the app's tests and to demo every
+verdict). With the mock, APP_MOCK_VERDICT=compliant|inconclusive|
+non_compliant forces a verdict.
 
 Returned structure (also what the JSON export contains, under "result"):
 
@@ -29,9 +34,8 @@ Returned structure (also what the JSON export contains, under "result"):
       "mock": bool,
     }
 
-Plugging in the real pipelines means replacing `read_photos` only: it must
-return a `Readings`. `summarize` (verdict and reasons from required vs found)
-is not mock and stays. Where each part lives:
+`read_photos` returns a `Readings`; `summarize` turns required vs found into
+the verdict and its reasons. Where each part lives:
 
 - Back (src/vision/back/pipeline.py): `read_back(image)` with a BGR image
   (cv2.imread) returns a BackResult; `result.reading.facts` is a
@@ -45,9 +49,10 @@ is not mock and stays. Where each part lives:
   product category, which the app doesn't ask for yet: use
   Exemption.NONE; an `assessment.needs_warning is None` from a CONDITIONAL
   exemption should make the verdict inconclusive.
-- Front (src/vision/front/, being built on another branch): must give, per
-  nutrient, whether its "ALTO EM" warning is printed (True/False), or None
-  when it can't tell.
+- Front (src/vision/front/warnings.py): `read_front(image, method)` gives,
+  per nutrient, whether its "ALTO EM" warning is printed. A panel found by
+  the detector with no nutrient read means a warning is there but can't be
+  read: all None (inconclusive), not "no warning" (a false violation).
 
 The pipelines need src/ on sys.path (as tests/conftest.py does), and their
 heavy imports (OCR models) should happen once, at the first call.
@@ -55,8 +60,14 @@ heavy imports (OCR models) should happen once, at the first call.
 
 import hashlib
 import os
+import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT / "src") not in sys.path:
+    sys.path.append(str(REPO_ROOT / "src"))
 
 NUTRIENTS = ("added_sugars", "saturated_fat", "sodium")
 VERDICTS = ("compliant", "inconclusive", "non_compliant")
@@ -89,7 +100,11 @@ class Readings:
 
 
 def analyze(front_path: Path, back_path: Path) -> dict:
-    readings = read_photos(Path(front_path), Path(back_path))
+    if os.environ.get("APP_PIPELINE") == "mock":
+        readings = read_mock(Path(front_path), Path(back_path))
+    else:
+        with _PIPELINE_LOCK:
+            readings = read_photos(Path(front_path), Path(back_path))
     verdict, reasons = summarize(readings)
     return {
         "verdict": verdict,
@@ -132,8 +147,74 @@ def summarize(readings: Readings) -> tuple[str, list[str]]:
     return "compliant", ["Nenhum alerta é exigido e nenhum foi impresso."]
 
 
+# The OCR engines and the detector are module-level singletons, not meant
+# for concurrent calls: one analysis at a time.
+_PIPELINE_LOCK = threading.Lock()
+
+
+def front_method():
+    from vision.front.detector import MODEL_PATH
+
+    method = os.environ.get("APP_FRONT_METHOD")
+    if method in ("ocr", "yolo"):
+        return method
+    return "yolo" if MODEL_PATH.exists() else "ocr"
+
+
+def read_photos(front_path: Path, back_path: Path) -> Readings:
+    """The real pipelines. Heavy imports (OCR models, detector) happen here,
+    at the first analysis, and stay loaded."""
+    import cv2
+
+    from rules.anvisa import Exemption, Nutrient, assess
+    from vision.back.pipeline import ENGINE, read_back
+    from vision.front.warnings import read_front
+
+    back = read_back(_imread(back_path))
+    facts = back.reading.facts
+    readable = back.readable
+    nutrition = {
+        "basis": facts.basis.value if readable and facts.basis else None,
+        # An old-format table is per portion: its numbers aren't per 100 g.
+        "added_sugars_g": facts.added_sugars_g if readable else None,
+        "saturated_fat_g": facts.saturated_fat_g if readable else None,
+        "sodium_mg": facts.sodium_mg if readable else None,
+    }
+    if readable:
+        # The app doesn't ask for the product category yet: no exemption.
+        assessment = assess(facts, Exemption.NONE)
+        required = {
+            n.value: (None if n in assessment.unknown else n in assessment.required)
+            for n in Nutrient
+        }
+    else:
+        required = {n.value: None for n in Nutrient}
+
+    method = front_method()
+    front = read_front(_imread(front_path), method=method)
+    found = {n.value: bool(present) for n, present in front.warnings.items()}
+    if front.boxes and not front.has_warning:
+        found = {n: None for n in found}
+
+    versions = {
+        "back": f"locate + Tesseract/RapidOCR ({ENGINE})",
+        "front": "YOLO + OCR" if method == "yolo" else "OCR",
+        "rules": "IN 75/2020, Anexo XV",
+    }
+    return Readings(nutrition, required, found, back.photo_type.value, versions)
+
+
+def _imread(path):
+    import cv2
+
+    image = cv2.imread(str(path))
+    if image is None:
+        raise ValueError(f"not an image: {path}")
+    return image
+
+
 # ---------------------------------------------------------------- MOCK ---
-# Everything below is fake and goes away when the pipelines are plugged in.
+# Fake readings, for the app's tests and demos (APP_PIPELINE=mock).
 
 # Copy of IN 75/2020 Annex XV (src/rules/anvisa.py LIMITS), solid foods only,
 # so that the fake numbers look consistent with the fake warnings.
@@ -141,7 +222,7 @@ MOCK_LIMITS = {"added_sugars": 15.0, "saturated_fat": 6.0, "sodium": 600.0}
 MOCK_VERSIONS = {"back": "mock", "front": "mock", "rules": "mock"}
 
 
-def read_photos(front_path: Path, back_path: Path) -> Readings:
+def read_mock(front_path: Path, back_path: Path) -> Readings:
     """MOCK: deterministic fake readings derived from the files' bytes."""
     digest = hashlib.sha256(front_path.read_bytes() + back_path.read_bytes())
     seed = digest.digest()

@@ -24,6 +24,9 @@ def jpeg(seed: int, size=(60, 80)) -> bytes:
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("APP_MOCK_VERDICT", raising=False)
+    # The interface is tested on fake readings; the pipelines have their own
+    # tests and evaluations.
+    monkeypatch.setenv("APP_PIPELINE", "mock")
     return TestClient(app)
 
 
