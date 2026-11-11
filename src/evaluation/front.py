@@ -104,6 +104,9 @@ YOLO_VARIANTS = {
     "yolo_s0.25": dict(min_score=0.25),
     "yolo_s0.5": dict(min_score=0.5),
     "yolo_s0.1_anchor": dict(min_score=0.1, rule="anchor"),
+    "yolo_s0.1_sim0.7": dict(min_score=0.1, min_similarity=0.7),
+    "yolo_s0.1_sim0.6": dict(min_score=0.1, min_similarity=0.6),
+    "yolo_s0.05_sim0.7": dict(min_score=0.05, min_similarity=0.7),
     "yolo_s0.1+ocr": dict(min_score=0.1, union=True),
 }
 

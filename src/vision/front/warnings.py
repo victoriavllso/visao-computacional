@@ -62,6 +62,9 @@ CROP_MIN_SIDE = 480
 # "any": a nutrient read anywhere in a crop counts; "anchor": only in crops
 # where "ALTO EM" is also read.
 CROP_RULE = "any"
+# Inside a detected panel the only words are "ALTO EM" and the three
+# nutrients, so a looser match is safe there.
+CROP_MIN_SIMILARITY = MIN_SIMILARITY
 
 
 @dataclass
@@ -171,7 +174,12 @@ def read_panel(image, box, margin=CROP_MARGIN, min_side=CROP_MIN_SIDE):
 
 
 def find_warnings_in_panels(
-    panels, boxes=(), rule=CROP_RULE, keys=KEYS, spanish=SPANISH
+    panels,
+    boxes=(),
+    rule=CROP_RULE,
+    keys=KEYS,
+    spanish=SPANISH,
+    min_similarity=CROP_MIN_SIMILARITY,
 ) -> FrontResult:
     """`panels`: the lines read in each detected panel. A Spanish panel
     isn't an RDC 429/2020 warning."""
@@ -185,7 +193,11 @@ def find_warnings_in_panels(
 
     texts = [normalize(w.text) for w in kept]
     warnings = {
-        nutrient: any(contains(text, key) for text in texts for key in alternatives)
+        nutrient: any(
+            contains(text, key, min_similarity)
+            for text in texts
+            for key in alternatives
+        )
         for nutrient, alternatives in keys.items()
     }
     every = [w for words in panels for w in words]
