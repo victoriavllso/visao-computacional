@@ -281,7 +281,7 @@ function renderResult(entry) {
     </section>
 
     <div class="actions">
-      <a class="button primary" href="api/analyses/${entry.id}/export" download>${icon("download", "")} Exportar JSON</a>
+      <button type="button" class="button primary" data-export="${entry.id}">${icon("download", "")} Exportar JSON</button>
       <a class="button" href="#/">Nova análise</a>
       <button type="button" class="button danger" data-delete="${entry.id}">${icon("trash", "")} Excluir</button>
     </div>`;
@@ -316,12 +316,58 @@ function renderHistory(entries) {
     <ul class="history-list">${items}</ul>`;
 }
 
+// ------------------------------------------------------------- Dialog ---
+
+// Resolves with the value of the button that closed it ("" on Esc).
+function openDialog({ title, body, actions }) {
+  const dialog = $("#dialog");
+  $("#dialog-title").textContent = title;
+  $("#dialog-body").innerHTML = body;
+  $("#dialog-actions").innerHTML = actions.join("");
+  dialog.returnValue = "";
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener("close", () => resolve(dialog.returnValue), { once: true });
+  });
+}
+
+const closeButton = (label = "Fechar", cls = "") =>
+  `<button class="button ${cls}" value="close">${label}</button>`;
+
+function showError(message) {
+  return openDialog({ title: "Algo deu errado", body: `<p>${esc(message)}</p>`, actions: [closeButton("Ok")] });
+}
+
+async function exportAnalysis(id) {
+  let entry;
+  try {
+    entry = await api(`api/analyses/${id}/export`);
+  } catch (error) {
+    showError(error.message);
+    return;
+  }
+  // The download link is the same endpoint: the server names the file.
+  openDialog({
+    title: "Exportar JSON",
+    body: `<pre class="json" tabindex="0" aria-label="Conteúdo do JSON">${esc(JSON.stringify(entry, null, 2))}</pre>`,
+    actions: [
+      closeButton(),
+      `<a class="button primary" href="api/analyses/${id}/export" download>${icon("download", "")} Baixar arquivo</a>`,
+    ],
+  });
+}
+
 async function deleteAnalysis(id) {
-  if (!confirm("Excluir esta análise e suas fotos? Não é possível desfazer.")) return;
+  const answer = await openDialog({
+    title: "Excluir análise?",
+    body: "<p>A análise e suas fotos serão apagadas. Não é possível desfazer.</p>",
+    actions: [closeButton("Cancelar"), '<button class="button danger" value="delete">Excluir</button>'],
+  });
+  if (answer !== "delete") return;
   try {
     await api(`api/analyses/${id}`, { method: "DELETE" });
   } catch (error) {
-    alert(error.message);
+    showError(error.message);
     return;
   }
   if (location.hash === "#/historico") route();
@@ -391,6 +437,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-delete]");
     if (button) deleteAnalysis(button.dataset.delete);
+    const exporter = event.target.closest("[data-export]");
+    if (exporter) exportAnalysis(exporter.dataset.export);
   });
 
   window.addEventListener("hashchange", route);

@@ -120,6 +120,15 @@
     </section>
   </main>
 
+  <!-- In-page dialog: some embedded browsers block confirm()/alert(). -->
+  <dialog id="dialog" class="dialog" aria-labelledby="dialog-title">
+    <form method="dialog">
+      <h2 id="dialog-title"></h2>
+      <div id="dialog-body"></div>
+      <div class="dialog-actions" id="dialog-actions"></div>
+    </form>
+  </dialog>
+
   <div id="busy" class="busy" hidden role="status" aria-live="polite">
     <div class="busy-card"><span class="spinner" aria-hidden="true"></span> Analisando as fotos…</div>
   </div>
