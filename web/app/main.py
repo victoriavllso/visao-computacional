@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app import images, pipeline, storage
+from app.export import exportacao
 from app.images import InvalidImage
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -123,10 +124,10 @@ def delete_analysis(analysis_id: str = AnalysisId):
 @app.get("/api/analyses/{analysis_id}/export")
 def export_analysis(analysis_id: str = AnalysisId):
     entry = get_or_404(analysis_id)
-    entry.pop("extensions")
     filename = f"analise-{entry['created_at'][:10]}-{analysis_id[:8]}.json"
     return JSONResponse(
-        entry, headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        exportacao(entry),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

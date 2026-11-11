@@ -112,7 +112,37 @@ def test_json_export(client):
     assert "attachment" in response.headers["content-disposition"]
     exported = response.json()
     assert exported["id"] == entry["id"]
-    assert exported["result"]["nutrition"] == entry["result"]["nutrition"]
+    # In Portuguese, like the labels: keys and codes translated.
+    result, resultado = entry["result"], exported["resultado"]
+    assert set(resultado) == {
+        "modo",
+        "veredito",
+        "motivos",
+        "observacoes",
+        "tabela_nutricional",
+        "alertas_exigidos",
+        "alertas_na_frente",
+        "foto_do_verso",
+        "versoes",
+        "simulado",
+    }
+    assert resultado["modo"] == "frente_e_verso"
+    assert resultado["motivos"] == result["reasons"]
+    tabela = resultado["tabela_nutricional"]
+    assert tabela["sodio_mg"] == result["nutrition"]["sodium_mg"]
+    assert set(resultado["alertas_exigidos"]) == {
+        "acucar_adicionado",
+        "gordura_saturada",
+        "sodio",
+    }
+
+
+def test_json_export_table_only(client):
+    files = {"back": ("verso.jpg", jpeg(2), "image/jpeg")}
+    entry = client.post("/api/analyses", files=files).json()
+    resultado = client.get(f"/api/analyses/{entry['id']}/export").json()["resultado"]
+    assert resultado["modo"] == "so_tabela_nutricional"
+    assert resultado["veredito"] == "informativo"
 
 
 @pytest.mark.parametrize(
