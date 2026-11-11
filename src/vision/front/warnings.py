@@ -62,7 +62,7 @@ PANEL_HEIGHT_RATIO = (0.5, 2.0)
 CROP_MARGIN = 0.15
 CROP_MIN_SIDE = 480
 # "any": a nutrient read anywhere in a crop counts; "anchor": only in crops
-# where "ALTO EM" is also read (dev: 97.3% → 95.9%, the anchor is often
+# where "ALTO EM" is also read (dev: 97.6% → 96.1%, the anchor is often
 # misread when the nutrients aren't).
 CROP_RULE = "any"
 # Inside a detected panel the only words are "ALTO EM" and the three
