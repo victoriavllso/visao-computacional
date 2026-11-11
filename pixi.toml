@@ -74,6 +74,7 @@ label = "python src/labeling/server.py"
 compact-labels = "python src/labeling/labels.py --compact"
 eval = "python src/evaluation/back.py"
 eval-front = "python src/evaluation/front.py"
+eval-e2e = "python src/evaluation/end_to_end.py"
 
 [feature.dev.tasks]
 hooks = "pre-commit install"
