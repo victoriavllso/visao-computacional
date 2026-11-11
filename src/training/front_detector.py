@@ -90,7 +90,9 @@ def write_dataset(photos):
                     f"0 {(x + w / 2) / width:.6f} {(y + h / 2) / height:.6f} "
                     f"{w / width:.6f} {h / height:.6f}"
                 )
-        (DATASET_DIR / "labels" / f"{code}.txt").write_text("\n".join(lines))
+        label = DATASET_DIR / "labels" / f"{code}.txt"
+        if not label.exists() or label.read_text() != "\n".join(lines):
+            label.write_text("\n".join(lines))
 
 
 def write_split(name, train, held_out):
@@ -175,31 +177,26 @@ def main():
     positives = sum(bool(b) for b in photos.values())
     log.info(f"{len(photos)} dev photos, {positives} with panels")
 
-    summary_file = DETECTOR_DIR / args.tag / "summary.json"
-    summary_file.parent.mkdir(parents=True, exist_ok=True)
-    summary = json.loads(summary_file.read_text()) if summary_file.exists() else {}
-    summary["args"] = vars(args)
+    # One JSON per model: folds can train in parallel processes.
+    run_dir = DETECTOR_DIR / args.tag
+    run_dir.mkdir(parents=True, exist_ok=True)
     for name in args.folds:
         if name == "all":
             config = write_split("all", list(photos), [])
-            name = "all"
         else:
             k = int(name)
             held_out = [c for c in photos if fold_of(c) == k]
-            config = write_split(
-                f"fold{k}", [c for c in photos if fold_of(c) != k], held_out
-            )
             name = f"fold{k}"
+            config = write_split(name, [c for c in photos if fold_of(c) != k], held_out)
         log.info(f"Training {name}")
-        summary[name] = train(name, config, args)
-        log.info(f"{name}: {summary[name]}")
-        summary_file.write_text(json.dumps(summary, indent=2))
+        scores = {"args": vars(args), **train(name, config, args)}
+        log.info(f"{name}: {scores}")
+        (run_dir / f"{name}.json").write_text(json.dumps(scores, indent=2))
 
-    if args.install and "all" in summary:
+    if args.install:
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(summary["all"]["onnx"], MODEL_PATH)
+        shutil.copy(run_dir / "all.onnx", MODEL_PATH)
         log.info(f"Final model: {MODEL_PATH}")
-    print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":
