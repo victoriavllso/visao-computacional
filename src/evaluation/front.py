@@ -83,14 +83,18 @@ LOWEST_SCORE = 0.05
 
 # Each variant adds one rule to the previous; "anywhere" drops the panel.
 FIRST_KEYS = {n: alternatives[:1] for n, alternatives in KEYS.items()}
+# "+not_alto_en" was dropped (it rejects real warnings read "ALTOEN") for
+# "+not_spanish", on top of "+reach_height".
+NO_SPANISH = dict(spanish=())
 VARIANTS = {
-    "v1": dict(keys=FIRST_KEYS, reach=(10, 7), height_ratio=(0.6, 1.6), not_anchors=()),
-    "+any_word": dict(reach=(10, 7), height_ratio=(0.6, 1.6), not_anchors=()),
-    "+reach_height": dict(not_anchors=()),
-    "+not_alto_en": dict(),
+    "v1": dict(keys=FIRST_KEYS, reach=(10, 7), height_ratio=(0.6, 1.6), **NO_SPANISH),
+    "+any_word": dict(reach=(10, 7), height_ratio=(0.6, 1.6), **NO_SPANISH),
+    "+reach_height": dict(**NO_SPANISH),
+    "+not_alto_en": dict(not_anchors=("altoen",), **NO_SPANISH),
+    "+not_spanish": dict(),
     "anywhere": dict(scope="anywhere"),
 }
-OCR_DEFAULT = "+not_alto_en"
+OCR_DEFAULT = "+not_spanish"
 
 # YOLO + OCR: box score threshold and crop rule on the same boxes and
 # crops; "+ocr" also takes what the whole-photo OCR finds (costs both).

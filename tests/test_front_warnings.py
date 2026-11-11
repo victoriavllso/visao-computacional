@@ -109,3 +109,14 @@ def test_detector_decodes_classic_output_with_nms():
 def test_fold_is_stable():
     assert fold_of("7891000502204") == fold_of("7891000502204")
     assert {fold_of(str(code)) for code in range(100)} == set(range(5))
+
+
+def test_alto_em_read_as_alto_en_still_anchors():
+    words = [line("ALTOEN", 100, 100), line("AÇÚCAR", 100, 150)]
+    assert found(find_warnings(words)) == {Nutrient.ADDED_SUGARS}
+
+
+def test_spanish_warning_is_not_counted():
+    words = [line("ALTO EN", 100, 100), line("GRASAS", 100, 150)]
+    words.append(line("SATURADAS", 100, 195))
+    assert found(find_warnings(words)) == set()

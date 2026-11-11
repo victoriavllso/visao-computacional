@@ -31,9 +31,12 @@ from vision.back.ocr import read_words_rapidocr
 from vision.back.parse import Word, normalize, similarity
 
 ANCHOR = "altoem"
-# Imported products may carry the Spanish warning ("ALTO EN"), which isn't
-# the RDC 429/2020 one; one letter apart, so rejected explicitly.
-NOT_ANCHORS = ("altoen",)
+# Imported products may carry the Spanish warning ("ALTO EN AZÚCARES /
+# GRASAS SATURADAS / SODIO"), which isn't the RDC 429/2020 one. Rejecting
+# "ALTO EN" as an anchor lost 2 real warnings on dev (the OCR reads "ALTO
+# EM" as "ALTOEN"): a panel is Spanish by its Spanish words instead.
+NOT_ANCHORS = ()
+SPANISH = ("grasa", "azucares", "calorias")
 # Words of each phrase: "açúcar adicionado", "gordura saturada", "sódio".
 # Each word may be read on its own line, and inside the warning panel any
 # one of them identifies the nutrient.
@@ -89,6 +92,10 @@ def is_anchor(text, not_anchors=NOT_ANCHORS):
     return contains(text, ANCHOR) and not any(k in text for k in not_anchors)
 
 
+def is_spanish(words, spanish=SPANISH):
+    return any(k in normalize(w.text) for w in words for k in spanish)
+
+
 def near(word, anchor, reach=PANEL_REACH, height_ratio=PANEL_HEIGHT_RATIO):
     reach_x, reach_y = reach
     low, high = height_ratio
@@ -106,9 +113,17 @@ def find_warnings(
     reach=PANEL_REACH,
     height_ratio=PANEL_HEIGHT_RATIO,
     not_anchors=NOT_ANCHORS,
+    spanish=SPANISH,
 ) -> FrontResult:
     """The other parameters exist to measure each rule (evaluation/front.py)."""
     anchors = [w for w in words if is_anchor(normalize(w.text), not_anchors)]
+    anchors = [
+        a
+        for a in anchors
+        if not is_spanish(
+            [w for w in words if near(w, a, reach, height_ratio)], spanish
+        )
+    ]
     if scope == "panel":
         panel = [
             w for w in words if any(near(w, a, reach, height_ratio) for a in anchors)
@@ -156,16 +171,14 @@ def read_panel(image, box, margin=CROP_MARGIN, min_side=CROP_MIN_SIDE):
 
 
 def find_warnings_in_panels(
-    panels, boxes=(), rule=CROP_RULE, keys=KEYS, not_anchors=NOT_ANCHORS
+    panels, boxes=(), rule=CROP_RULE, keys=KEYS, spanish=SPANISH
 ) -> FrontResult:
-    """`panels`: the lines read in each detected panel. A crop reading only
-    the Spanish "ALTO EN" isn't an RDC 429/2020 warning."""
+    """`panels`: the lines read in each detected panel. A Spanish panel
+    isn't an RDC 429/2020 warning."""
     kept, anchors = [], []
     for words in panels:
-        texts = [normalize(w.text) for w in words]
-        crop_anchors = [w for w, t in zip(words, texts) if is_anchor(t, not_anchors)]
-        spanish = any(k in t for t in texts for k in not_anchors)
-        if (rule == "anchor" or spanish) and not crop_anchors:
+        crop_anchors = [w for w in words if is_anchor(normalize(w.text))]
+        if is_spanish(words, spanish) or (rule == "anchor" and not crop_anchors):
             continue
         kept += words
         anchors += crop_anchors
