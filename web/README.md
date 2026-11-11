@@ -35,6 +35,28 @@ network, run `pixi run -e web uvicorn app.main:app --app-dir web --host 0.0.0.0`
 and open `http://<computer's IP>:8000`. Note that browsers only offer the
 camera button on phones; on desktop both buttons open the file picker.
 
+### On the UFSC JupyterHub server
+
+Each person runs the app on their own JupyterHub server and opens it through
+JupyterHub's proxy, so it only needs a browser (also on a phone, after
+signing in to JupyterHub there). The app needs only the repository (the
+detector weights are in `models/`), not the dataset. In a JupyterLab
+terminal:
+
+```bash
+export PATH=~/privado/.pixi/bin:$PATH     # pixi set up as in the main README
+cd ~/privado/visao-computacional          # the clone, in privado/ (persists)
+git pull
+pixi install -e web
+nohup pixi run -e web app > ~/privado/app.log 2>&1 &
+```
+
+Then open `https://jupyter.vlab.ufsc.br/user/<your user>/proxy/8000/` (the
+trailing slash matters). Only the owner of the JupyterHub server can open
+that address: each colleague runs their own copy, with their own history.
+The app stops when the container stops; run the last command again after
+signing in. To stop it: `pkill -f "uvicorn app.main:app"`.
+
 ## Layout
 
 | File | Role |
