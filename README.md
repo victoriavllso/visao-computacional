@@ -428,6 +428,25 @@ Tried and dropped:
 
 ---
 
+## ✅ Whole system: photos → verdict (the app)
+
+The app (`web/`, see its README) runs the back pipeline, the rules and the front pipeline (YOLO + OCR) on a pair of photos and gives a verdict: compliant, inconclusive or non-compliant. `pixi run eval-e2e --split dev` compares that verdict with the one the hand labels of both sides give (same rules, same `summarize()`), on every product with both sides labeled.
+
+Dev, 494 products (2026-11-11, server, 32 workers, ~3 min):
+
+| Labels \ App | compliant | inconclusive | non-compliant |
+| :--- | ---: | ---: | ---: |
+| **compliant** (309) | **241** | 47 | 21 |
+| **inconclusive** (126) | 51 | **67** | 8 |
+| **non-compliant** (59) | 4 | 7 | **48** |
+
+- Same verdict as the labels: **72.1%**; when the app decides (not inconclusive, 373 products): 77.5%.
+- Violations: 48 of 59 caught (81.4%), only 4 called compliant.
+- False accusations: 21 of 309 compliant products (6.8%) called non-compliant; of the app's 77 "non-compliant" answers, 48 are right (62%).
+- Truly inconclusive products (old-format tables, values nobody could read) called compliant: 51 of 126, the old-format detection weakness of the back pipeline.
+
+Val is kept for the final check.
+
 ## 📊 Dataset Details
 
 The dataset files are stored in Apache Parquet format:
