@@ -99,3 +99,5 @@ De vez em quando, para tirar as linhas repetidas (produto salvo mais de uma vez)
 - `src/labeling/labels.py`: lê os rótulos (linhas corrompidas são ignoradas com um aviso) e decide o gabarito de cada produto (manual se existir, OFF se não).
 - `pixi run eval --split dev`: avaliação do pipeline do verso; `--hand-only` avalia só os produtos rotulados à mão.
 - `pixi run pipeline` (etapa 4): os avisos esperados de cada produto também usam os rótulos manuais.
+- `pixi run eval-front --split dev [--method yolo]`: avaliação do pipeline da frente contra os rótulos da frente (avisos marcados).
+- `pixi run -e detector train-detector`: as caixas dos painéis (só da `dev`) treinam o detector de avisos; fotos da frente sem caixa são exemplos negativos, por isso um aviso visível precisa de caixa.

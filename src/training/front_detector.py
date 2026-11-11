@@ -13,10 +13,12 @@ of epochs and keeps the last weights; the held-out fold is only scored.
 
     pixi run -e detector train-detector [--folds 0 1 2 3 4 all]
         [--model yolo26n.pt] [--imgsz 1024] [--epochs 100] [--device 0]
+        [--tag yolo26n_1024] [--install]
 
-Writes the dataset and runs to data/detector/, the fold models to
-data/detector/<tag>/fold<k>.onnx and the final model to
-models/front_detector.onnx.
+Writes the dataset and runs to data/detector/, each model to
+data/detector/<tag>/<fold<k> | all>.onnx with its held-out scores in a JSON
+next to it, and with --install copies the final model to
+models/front_detector.onnx. Training isn't bit-exact (images cached in RAM).
 """
 
 import argparse
