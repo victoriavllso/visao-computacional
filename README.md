@@ -38,6 +38,7 @@ Everything runs inside the pixi environment, through `pixi run <task>` (tasks in
 | `pixi run eval --split dev --hand-only` | Evaluate the back pipeline (options below) |
 | `pixi run label` | Open the hand-labeling tool (see [LABELING.md](LABELING.md)) |
 | `pixi run compact-labels` | Merge the hand label files into one, one entry per product |
+| `pixi run -e web app` | Open the web app at http://localhost:8000 (see [web/README.md](web/README.md)) |
 
 Typical first-time flow:
 
