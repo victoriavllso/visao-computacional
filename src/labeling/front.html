@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Front Warnings</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66;
+    --line: #dcdcd6; --accent: #2457c5; --ok: #1f7a3d; --box: #e8590c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161615; --panel: #20201e; --text: #ececea; --muted: #a2a29c;
+      --line: #3a3a36; --accent: #7aa2ff; --ok: #5cc483; --box: #ff8a3d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; gap: 16px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  header a { color: var(--accent); }
+  .progress { color: var(--muted); }
+  main { display: grid; grid-template-columns: 1fr 340px; height: calc(100vh - 52px); }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } }
+  .viewer { overflow: auto; padding: 12px; }
+  .stage { position: relative; display: inline-block; cursor: crosshair; user-select: none; }
+  .stage img { display: block; max-width: 100%; max-height: calc(100vh - 110px); border: 1px solid var(--line); background: #fff; }
+  .stage.zoomed img { max-width: none; max-height: none; }
+  .box { position: absolute; border: 3px solid var(--box); pointer-events: none; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); padding: 16px; overflow: auto; }
+  .code { font-family: ui-monospace, monospace; font-size: 18px; margin-bottom: 4px; }
+  .field { margin: 14px 0; }
+  .field > b { display: block; margin-bottom: 4px; }
+  .field label { display: block; margin: 5px 0; }
+  .warn label { font-size: 17px; }
+  kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted); }
+  input[type=text] { width: 100%; padding: 7px; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
+  button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); cursor: pointer; font: inherit; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .saved { color: var(--ok); font-weight: 600; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .nav { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  select { padding: 6px; font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Front warnings</h1>
+  <select id="queue"></select>
+  <span class="progress" id="progress"></span>
+  <label><input type="checkbox" id="skipDone" checked> skip already labeled</label>
+  <a href="/">back labels →</a>
+</header>
+<main>
+  <section class="viewer">
+    <div class="stage" id="stage"><img id="image" alt="front photo" draggable="false"></div>
+  </section>
+  <aside>
+    <div class="code" id="code"></div>
+    <div id="savedNote"></div>
+
+    <div class="field warn">
+      <b>"ALTO EM" warnings on the photo</b>
+      <label><input type="checkbox" id="added_sugars"> açúcar adicionado <kbd>1</kbd></label>
+      <label><input type="checkbox" id="saturated_fat"> gordura saturada <kbd>2</kbd></label>
+      <label><input type="checkbox" id="sodium"> sódio <kbd>3</kbd></label>
+      <div class="muted">None checked = no warning on the photo.</div>
+    </div>
+
+    <div class="field">
+      <b>Boxes <span class="muted" id="boxCount"></span></b>
+      <div class="muted">Drag on the photo around each warning panel (the black rectangle with the magnifier). <kbd>Z</kbd> zooms.</div>
+      <div class="nav"><button id="undoBox">Undo box</button><button id="clearBoxes">Clear boxes</button></div>
+    </div>
+
+    <div class="field">
+      <b>Photo</b>
+      <label><input type="radio" name="status" value="ok" checked> front of the package</label>
+      <label><input type="radio" name="status" value="unreadable"> a warning is there, but which one can't be read</label>
+      <label><input type="radio" name="status" value="not_front"> not the front / package not visible</label>
+    </div>
+
+    <div class="field">
+      <b>Note</b>
+      <input type="text" id="note" placeholder="e.g. warning cut off at the edge">
+    </div>
+
+    <div class="nav">
+      <button id="prev">← Previous</button>
+      <button class="primary" id="save">Save &amp; next (Enter)</button>
+      <button id="skip">Skip →</button>
+    </div>
+  </aside>
+</main>
+<script>
+const NUTRIENTS = ["added_sugars", "saturated_fat", "sodium"];
+let items = [], index = 0, boxes = [], drag = null;
+const $ = id => document.getElementById(id);
+
+async function loadQueue(name) {
+  const data = await (await fetch(`/api/front/queue?name=${encodeURIComponent(name)}`)).json();
+  if (!$("queue").options.length) {
+    for (const q of data.queues) $("queue").add(new Option(q, q));
+    $("queue").value = name;
+  }
+  items = data.items;
+  index = 0;
+  next(0);
+  show();
+}
+
+function next(step) {
+  let i = index + step;
+  while ($("skipDone").checked && i < items.length && items[i].label) i++;
+  index = Math.min(Math.max(i, 0), Math.max(items.length - 1, 0));
+}
+
+// Box coordinates are kept in pixels of the original photo.
+function scale() { return $("image").naturalWidth / $("image").clientWidth || 1; }
+
+function drawBoxes() {
+  for (const el of document.querySelectorAll(".box")) el.remove();
+  const s = scale();
+  for (const [x, y, w, h] of boxes.concat(drag ? [drag.box] : [])) {
+    const el = document.createElement("div");
+    el.className = "box";
+    Object.assign(el.style, { left: `${x / s}px`, top: `${y / s}px`, width: `${w / s}px`, height: `${h / s}px` });
+    $("stage").appendChild(el);
+  }
+  $("boxCount").textContent = boxes.length ? `(${boxes.length})` : "";
+}
+
+function show() {
+  const done = items.filter(it => it.label).length;
+  $("progress").textContent = `${index + 1} / ${items.length} · ${done} labeled`;
+  const item = items[index];
+  if (!item) { $("code").textContent = "Queue empty"; return; }
+  const label = item.label || {};
+  $("code").textContent = item.code;
+  $("savedNote").innerHTML = item.label ? `<span class="saved">✓ saved ${label.saved_at || ""}</span>` : "";
+  for (const n of NUTRIENTS) $(n).checked = !!label[n];
+  for (const r of document.getElementsByName("status")) r.checked = r.value === (label.status || "ok");
+  $("note").value = label.note || "";
+  boxes = (label.boxes || []).map(b => [...b]);
+  $("stage").classList.remove("zoomed");
+  $("image").src = `/img/front/${item.code}.jpg`;
+}
+
+async function save() {
+  const item = items[index];
+  if (!item) return;
+  const entry = { code: item.code, status: [...document.getElementsByName("status")].find(r => r.checked).value };
+  for (const n of NUTRIENTS) entry[n] = $(n).checked;
+  entry.boxes = boxes.map(b => b.map(Math.round));
+  entry.note = $("note").value.trim() || null;
+  const res = await fetch("/api/front/label", { method: "POST", body: JSON.stringify(entry) });
+  if (!res.ok) return alert("Save failed");
+  item.label = { ...entry, saved_at: "now" };
+  next(1);
+  show();
+}
+
+function point(e) {
+  const r = $("image").getBoundingClientRect(), s = scale();
+  const x = Math.min(Math.max(e.clientX - r.left, 0), r.width), y = Math.min(Math.max(e.clientY - r.top, 0), r.height);
+  return [x * s, y * s];
+}
+$("stage").onmousedown = e => { if (e.button === 0) { const p = point(e); drag = { start: p, box: [...p, 0, 0] }; } };
+window.onmousemove = e => {
+  if (!drag) return;
+  const [x0, y0] = drag.start, [x1, y1] = point(e);
+  drag.box = [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
+  drawBoxes();
+};
+window.onmouseup = () => {
+  // Ignore clicks: a box needs some size.
+  if (drag && drag.box[2] > 5 * scale() && drag.box[3] > 5 * scale()) boxes.push(drag.box);
+  drag = null;
+  drawBoxes();
+};
+
+$("image").onload = drawBoxes;
+window.onresize = drawBoxes;
+$("save").onclick = save;
+$("skip").onclick = () => { next(1); show(); };
+$("prev").onclick = () => { index = Math.max(index - 1, 0); show(); };
+$("undoBox").onclick = () => { boxes.pop(); drawBoxes(); };
+$("clearBoxes").onclick = () => { boxes = []; drawBoxes(); };
+$("queue").onchange = () => loadQueue($("queue").value);
+$("skipDone").onchange = () => { next(0); show(); };
+document.addEventListener("keydown", e => {
+  if (e.target.id === "note") { if (e.key === "Enter") { e.preventDefault(); save(); } return; }
+  if (e.key === "Enter") { e.preventDefault(); save(); }
+  else if (["1", "2", "3"].includes(e.key)) { const c = $(NUTRIENTS[+e.key - 1]); c.checked = !c.checked; }
+  else if (e.key === "z" || e.key === "Z") { $("stage").classList.toggle("zoomed"); drawBoxes(); }
+});
+loadQueue("val");
+</script>
+</body>
+</html>

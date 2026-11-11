@@ -1324,3 +1324,26 @@
 {"code": "7898215152019", "added_sugars": 45, "saturated_fat": 3.8, "sodium": 125, "basis": "100g", "status": "ok", "note": null, "saved_at": "2026-10-18T20:43:46", "labeler": "hand-labeled"}
 {"code": "7896292001084", "added_sugars": 0.2, "saturated_fat": 0.1, "sodium": 101, "basis": "100ml", "status": "ok", "note": null, "saved_at": "2026-10-18T20:45:36", "labeler": "hand-labeled"}
 {"code": "7896057800556", "added_sugars": 0, "saturated_fat": 15, "sodium": 0, "basis": "100ml", "status": "ok", "note": null, "saved_at": "2026-10-18T20:46:37", "labeler": "hand-labeled"}
+{"code": "7898571360042", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": null, "saved_at": "2026-11-04T11:47:36"}
+{"code": "7891000369098", "added_sugars": 40, "saturated_fat": 20, "sodium": 102, "basis": "100g", "status": "ok", "note": null, "saved_at": "2026-11-04T11:51:36"}
+{"code": "7897110300105", "added_sugars": 0, "saturated_fat": 50, "sodium": 567, "basis": "100g", "status": "ok", "note": "inverted colors", "saved_at": "2026-11-04T11:51:58"}
+{"code": "7908271307237", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-04T11:52:33"}
+{"code": "7898949878131", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": null, "saved_at": "2026-11-04T11:52:37"}
+{"code": "7898227830691", "added_sugars": 5, "saturated_fat": 0, "sodium": 33, "basis": "100g", "status": "ok", "note": null, "saved_at": "2026-11-04T11:52:51"}
+{"code": "7898113940305", "added_sugars": 0, "saturated_fat": 0, "sodium": 0, "basis": "100g", "status": "ok", "note": null, "saved_at": "2026-11-04T11:52:59"}
+{"code": "7891000325131", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": "many different tables.", "saved_at": "2026-11-04T11:53:14"}
+{"code": "7891164005832", "added_sugars": 0.2, "saturated_fat": null, "sodium": 1260, "basis": "100g", "status": "partial", "note": "table crop cuts out labels", "saved_at": "2026-11-04T11:53:46"}
+{"code": "7898755180305", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-04T11:53:56"}
+{"code": "7898962336144", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-04T11:54:00"}
+{"code": "8480000603067", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": "spanish", "saved_at": "2026-11-04T11:54:11"}
+{"code": "5607047020869", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": "different formated table", "saved_at": "2026-11-04T11:54:28"}
+{"code": "7898928536595", "added_sugars": 45, "saturated_fat": 19, "sodium": 3, "basis": "100g", "status": "ok", "note": null, "saved_at": "2026-11-04T11:54:59"}
+{"code": "7896496972203", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-04T11:55:12"}
+{"code": "7898916030685", "added_sugars": 0, "saturated_fat": 0, "sodium": 0, "basis": "100ml", "status": "ok", "note": null, "saved_at": "2026-11-04T11:55:29"}
+{"code": "7898637355951", "added_sugars": 1.6, "saturated_fat": 1.7, "sodium": 362, "basis": "100g", "status": "ok", "note": null, "saved_at": "2026-11-04T11:55:51"}
+{"code": "7898959802331", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-04T11:55:59"}
+{"code": "7898904409448", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": "water bottle - non applicable", "saved_at": "2026-11-04T11:56:17"}
+{"code": "5607047020852", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": "strange format", "saved_at": "2026-11-04T11:56:24"}
+{"code": "5601312184850", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": "strange format", "saved_at": "2026-11-04T11:56:35"}
+{"code": "7899941201811", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-04T11:56:50"}
+{"code": "7896004006833", "added_sugars": 40, "saturated_fat": 0.9, "sodium": 415, "basis": "100g", "status": "ok", "note": "split table in two columns", "saved_at": "2026-11-04T11:57:16"}

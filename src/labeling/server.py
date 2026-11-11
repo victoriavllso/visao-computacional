@@ -1,13 +1,17 @@
-"""Hand-labeling tool for the nutrition table values.
+"""Hand-labeling tool for both photos of each product.
 
-Shows each product's nutrition photo and saves the values read by a person
-(added sugars, saturated fat, sodium per 100 g/ml) as the ground truth for
-the back pipeline, replacing the noisy Open Food Facts values.
+/       back: the nutrition photo, and the values read by a person (added
+        sugars, saturated fat, sodium per 100 g/ml) as the ground truth for
+        the back pipeline, replacing the noisy Open Food Facts values.
+/front  front: which "ALTO EM" warnings the front photo shows, and a box
+        around each warning panel, as the ground truth for the front
+        pipeline (and training data for a detector).
 
     python src/labeling/server.py [--labeler <name>] [--port 8765]
 
-Labels are appended to labels/back/<name>.jsonl (default: hand-labeled.jsonl)
-as they are saved, so closing the page loses nothing. See LABELING.md.
+Labels are appended to labels/{back,front}/<name>.jsonl (default:
+hand-labeled.jsonl) as they are saved, so closing the page loses nothing.
+See LABELING.md.
 """
 
 import argparse
@@ -31,6 +35,7 @@ from utils.constants import (
     BACK_LABELS_DIR,
     DATA_DIR,
     FILTER_PAIRS_OUTPUT_FILE,
+    FRONT_LABELS_DIR,
     IMAGES_OUTPUT_DIR,
 )
 from utils.logger import Logger
@@ -39,6 +44,8 @@ from vision.back.locate import locate_table
 log = Logger("labeling")
 
 PAGE = Path(__file__).parent / "page.html"
+FRONT_PAGE = Path(__file__).parent / "front.html"
+FRONT_STATUSES = {"ok", "unreadable", "not_front"}
 EVAL_RESULTS = DATA_DIR / "evaluation" / "latest" / "back_dev.csv"
 NUTRIENTS = ("added_sugars", "saturated_fat", "sodium")
 
@@ -128,11 +135,32 @@ def review_queue(labels, photo_times=None):
                 f"labeled no table, but the pipeline read a {photo_types[code]}"
             )
 
-    return dict(sorted(reasons.items()))
+    # Replaced photos first: the label is surely stale, and the other reasons
+    # can list hundreds of labels.
+    replaced = "photo replaced after it was labeled"
+    order = sorted(reasons.items(), key=lambda item: (item[1] != replaced, item[0]))
+    return dict(order)
 
 
 def valid_code(code):
     return code.isdigit() and len(code) <= 20
+
+
+def valid_front_label(entry):
+    """status, one bool per warning, boxes as [x, y, width, height] in pixels
+    of the original photo."""
+    boxes = entry.get("boxes")
+    return (
+        entry.get("status") in FRONT_STATUSES
+        and all(isinstance(entry.get(n), bool) for n in NUTRIENTS)
+        and isinstance(boxes, list)
+        and all(
+            isinstance(box, list)
+            and len(box) == 4
+            and all(isinstance(v, (int, float)) and v >= 0 for v in box)
+            for box in boxes
+        )
+    )
 
 
 @lru_cache(maxsize=64)
@@ -146,7 +174,7 @@ def table_crop(code):
 
 
 class Handler(BaseHTTPRequestHandler):
-    queues, off, photo_times, labels_file = None, None, None, None
+    queues, off, photo_times, labels_file, front_labels_file = (None,) * 5
 
     def log_message(self, *args):
         pass
@@ -167,6 +195,18 @@ class Handler(BaseHTTPRequestHandler):
 
         if url.path == "/":
             return self.send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+        if url.path == "/front":
+            return self.send(200, FRONT_PAGE.read_bytes(), "text/html; charset=utf-8")
+
+        if url.path == "/api/front/queue":
+            name = parse_qs(url.query).get("name", ["val"])[0]
+            labels = load_labels(FRONT_LABELS_DIR)
+            # Front queues: the same products as the back ones, no review.
+            names = [q for q in self.queues if q != "dev_disagreements"]
+            items = [
+                {"code": c, "label": labels.get(c)} for c in self.queues.get(name, [])
+            ]
+            return self.send_json({"queues": names, "items": items})
 
         if url.path == "/api/queue":
             name = parse_qs(url.query).get("name", ["val"])[0]
@@ -191,8 +231,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, b"bad code", "text/plain")
             if kind == "table":
                 body = table_crop(code)
-            elif kind == "photo":
-                path = IMAGES_OUTPUT_DIR / "nutrition" / f"{code}.jpg"
+            elif kind in ("photo", "front"):
+                side = "nutrition" if kind == "photo" else "front"
+                path = IMAGES_OUTPUT_DIR / side / f"{code}.jpg"
                 body = path.read_bytes() if path.exists() else None
             else:
                 body = None
@@ -203,16 +244,23 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, b"not found", "text/plain")
 
     def do_POST(self):
-        if self.path != "/api/label":
+        files = {
+            "/api/label": self.labels_file,
+            "/api/front/label": self.front_labels_file,
+        }
+        if self.path not in files:
             return self.send(404, b"not found", "text/plain")
 
         entry = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         if not valid_code(str(entry.get("code", ""))):
             return self.send_json({"error": "bad code"}, 400)
+        if self.path == "/api/front/label" and not valid_front_label(entry):
+            return self.send_json({"error": "bad front label"}, 400)
 
         entry["saved_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-        self.labels_file.parent.mkdir(parents=True, exist_ok=True)
-        with self.labels_file.open("a") as f:
+        labels_file = files[self.path]
+        labels_file.parent.mkdir(parents=True, exist_ok=True)
+        with labels_file.open("a") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         self.send_json({"ok": True})
 
@@ -231,8 +279,9 @@ def main():
 
     Handler.queues, Handler.off, Handler.photo_times = build_queues()
     Handler.labels_file = BACK_LABELS_DIR / f"{labeler}.jsonl"
+    Handler.front_labels_file = FRONT_LABELS_DIR / f"{labeler}.jsonl"
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    log.info(f"Labeling tool at http://localhost:{args.port}")
+    log.info(f"Labeling tool at http://localhost:{args.port} (front: /front)")
     log.info(f"Labels saved to {Handler.labels_file}")
     server.serve_forever()
 
