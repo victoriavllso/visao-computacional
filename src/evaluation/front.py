@@ -3,8 +3,10 @@
 
 Accuracy counts photos labeled "front of the package"; photos where a
 warning is there but can't be read ("unreadable") are reported apart, and
-photos that aren't the front are left out. The OCR runs once per photo and
-every matching scope of vision.front.warnings is scored on its words.
+photos that aren't the front are left out. The OCR runs once per photo (and
+is cached in data/cache/, so changing the rules doesn't rerun it), and every
+rule variant in VARIANTS is scored on the same words: each one adds a rule
+to the previous, to measure what it brings.
 
     python src/evaluation/front.py --split dev [--limit 100] [--tag name]
         [--workers 32]
@@ -15,6 +17,7 @@ data/evaluation/latest/front_<split>.{csv,md}.
 """
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -40,13 +43,38 @@ from utils.constants import (
 )
 from utils.logger import Logger
 from vision.back.ocr import read_words_rapidocr
-from vision.front.warnings import find_warnings
+from vision.back.parse import Word
+from vision.front.warnings import KEYS, find_warnings
 
 log = Logger("eval front")
 
 EVAL_DIR = DATA_DIR / "evaluation"
-SCOPES = ("panel", "anywhere")
+OCR_CACHE = DATA_DIR / "cache" / "front_ocr"
 NUTRIENTS = [n.value for n in Nutrient]
+
+# Each variant adds one rule to the previous; "anywhere" drops the panel.
+FIRST_KEYS = {n: alternatives[:1] for n, alternatives in KEYS.items()}
+VARIANTS = {
+    "v1": dict(keys=FIRST_KEYS, reach=(10, 7), height_ratio=(0.6, 1.6), not_anchors=()),
+    "+any_word": dict(reach=(10, 7), height_ratio=(0.6, 1.6), not_anchors=()),
+    "+reach_height": dict(not_anchors=()),
+    "+not_alto_en": dict(),
+    "anywhere": dict(scope="anywhere"),
+}
+
+
+def ocr_words(code):
+    """RapidOCR lines of the front photo, from the cache if there."""
+    cached = OCR_CACHE / f"{code}.json"
+    if cached.exists():
+        return [Word(**w) for w in json.loads(cached.read_text())]
+    image = cv2.imread(str(IMAGES_OUTPUT_DIR / "front" / f"{code}.jpg"))
+    if image is None:
+        raise FileNotFoundError(code)
+    words = read_words_rapidocr(image)
+    OCR_CACHE.mkdir(parents=True, exist_ok=True)
+    cached.write_text(json.dumps([w.__dict__ for w in words], ensure_ascii=False))
+    return words
 
 
 def evaluate_product(args):
@@ -55,20 +83,17 @@ def evaluate_product(args):
     for n in NUTRIENTS:
         row[f"true_{n}"] = bool(label[n])
     try:
-        image = cv2.imread(str(IMAGES_OUTPUT_DIR / "front" / f"{code}.jpg"))
-        if image is None:
-            raise FileNotFoundError(code)
-        words = read_words_rapidocr(image)
+        words = ocr_words(code)
     except Exception as error:
         row["error"] = repr(error)
         return row
 
     row["lines"] = len(words)
-    for scope in SCOPES:
-        result = find_warnings(words, scope)
-        row[f"{scope}_anchors"] = len(result.anchors)
+    for variant, params in VARIANTS.items():
+        result = find_warnings(words, **params)
+        row[f"{variant}_anchors"] = len(result.anchors)
         for nutrient, found in result.warnings.items():
-            row[f"{scope}_{nutrient.value}"] = found
+            row[f"{variant}_{nutrient.value}"] = found
     return row
 
 
@@ -93,21 +118,21 @@ def scores(truth, pred):
     }
 
 
-def metrics(results, scope):
+def metrics(results, variant):
     """Scores on the photos labeled as the front, readable."""
     front = results[(results.status == "ok") & results.error.isna()]
     out = {"photos": len(front)}
     for n in NUTRIENTS:
         out[n] = scores(
-            front[f"true_{n}"].astype(bool), front[f"{scope}_{n}"].astype(bool)
+            front[f"true_{n}"].astype(bool), front[f"{variant}_{n}"].astype(bool)
         )
 
     true_any = front[[f"true_{n}" for n in NUTRIENTS]].any(axis=1)
-    pred_any = front[[f"{scope}_{n}" for n in NUTRIENTS]].any(axis=1)
+    pred_any = front[[f"{variant}_{n}" for n in NUTRIENTS]].any(axis=1)
     out["any"] = scores(true_any, pred_any)
     all_right = (
         front[[f"true_{n}" for n in NUTRIENTS]].values
-        == front[[f"{scope}_{n}" for n in NUTRIENTS]].values
+        == front[[f"{variant}_{n}" for n in NUTRIENTS]].values
     ).all(axis=1)
     out["all_three"] = all_right.mean() if len(front) else float("nan")
     out["all_three_with_warning"] = (
@@ -134,11 +159,11 @@ def report(results, args, elapsed):
         "",
     ]
     summary = {}
-    for scope in SCOPES:
-        m = metrics(results, scope)
-        summary[scope] = m
+    for variant in VARIANTS:
+        m = metrics(results, variant)
+        summary[variant] = m
         lines += [
-            f"## Scope `{scope}` ({m['photos']} photos)",
+            f"## Variant `{variant}` ({m['photos']} photos)",
             "",
             f"**All three warnings right:** **{pct(m['all_three'])}** "
             f"(photos with a warning: {pct(m['all_three_with_warning'])})",
@@ -153,7 +178,7 @@ def report(results, args, elapsed):
                 f"{pct(s['precision'])} | {pct(s['recall'])} | {pct(s['f1'])} |"
             )
         if len(unreadable):
-            seen = unreadable[[f"{scope}_{n}" for n in NUTRIENTS]].any(axis=1).mean()
+            seen = unreadable[[f"{variant}_{n}" for n in NUTRIENTS]].any(axis=1).mean()
             lines.append("")
             lines.append(
                 f"Unreadable warnings ({len(unreadable)}): a warning found on {pct(seen)}."
