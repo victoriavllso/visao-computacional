@@ -432,18 +432,27 @@ Tried and dropped:
 
 The app (`web/`, see its README) runs the back pipeline, the rules and the front pipeline (YOLO + OCR) on a pair of photos and gives a verdict: compliant, inconclusive or non-compliant. `pixi run eval-e2e --split dev` compares that verdict with the one the hand labels of both sides give (same rules, same `summarize()`), on every product with both sides labeled.
 
-Dev, 494 products (2026-11-11, server, 32 workers, ~3 min):
+Dev, 494 products (2026-11-11, server, 32 workers):
 
 | Labels \ App | compliant | inconclusive | non-compliant |
 | :--- | ---: | ---: | ---: |
-| **compliant** (309) | **241** | 47 | 21 |
-| **inconclusive** (126) | 51 | **67** | 8 |
-| **non-compliant** (59) | 4 | 7 | **48** |
+| **compliant** (309) | **243** | 48 | 18 |
+| **inconclusive** (126) | 51 | **68** | 7 |
+| **non-compliant** (59) | 4 | 8 | **47** |
 
-- Same verdict as the labels: **72.1%**; when the app decides (not inconclusive, 373 products): 77.5%.
-- Violations: 48 of 59 caught (81.4%), only 4 called compliant.
-- False accusations: 21 of 309 compliant products (6.8%) called non-compliant; of the app's 77 "non-compliant" answers, 48 are right (62%).
+- Same verdict as the labels: **72.5%**; when the app decides (not inconclusive, 370 products): 78.4%.
+- Violations: 47 of 59 caught (79.7%), only 4 called compliant.
+- False accusations: 18 of 309 compliant products (5.8%) called non-compliant; of the app's 72 "non-compliant" answers, 47 are right (65%).
 - Truly inconclusive products (old-format tables, values nobody could read) called compliant: 51 of 126, the old-format detection weakness of the back pipeline.
+
+**The false accusations come from the back.** Of the first run's 21, 20 were back misreadings (the front warnings were read right) and 1 a missed front warning. Their causes: values from the wrong column or row (%VD or per portion, ~9), physically impossible values (477 g of saturated fat per 100 g, 411,415 mg of sodium, ~6), thousands read as decimals ("1.180 mg" as 1.18, 2), values not read (~3). Two parser fixes, measured on dev:
+
+| Change | Back: all three right | E2E: same verdict | False accusations | Violations caught |
+| :--- | ---: | ---: | ---: | ---: |
+| Before | 77.4% | 72.1% | 21 | 48 / 59 |
+| + "1.180" read as 1180 (dot + three digits = thousands); amounts above 100 g or 40,000 mg of sodium per 100 g/ml dropped (another row, or unknown) | 77.6% | **72.5%** | **18** | 47 / 59 |
+
+Of the 20 readings it changed on dev, 5 are thousands fixed and 15 impossible values dropped; 3 false accusations went (2 now right, 1 inconclusive), none appeared. Fewer than the ~8 expected: %VD values such as 100, 90 or 60 are physically possible and pass the limit, and some dropped values were replaced by another wrong row. The violation lost had been "caught" by an impossible reading (359 g of sugar). The remaining false accusations are mostly the wrong column: the next thing to fix.
 
 Val is kept for the final check.
 
