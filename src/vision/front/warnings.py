@@ -12,9 +12,17 @@ found in two steps:
 
 and each nutrient is the distinctive word of its phrase, matched with
 tolerance for OCR errors.
+
+Two methods, same result (read_front):
+
+    "ocr"   RapidOCR on the whole photo, anchor + panel as above
+    "yolo"  a detector (detector.py) boxes the panels; RapidOCR reads each
+            crop, with a margin, at a size where the panel text is legible;
+            the nutrients are matched in the crops' text
 """
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import cv2
 
@@ -43,6 +51,15 @@ SCOPE = "panel"
 PANEL_REACH = (14, 7)  # horizontal, vertical
 PANEL_HEIGHT_RATIO = (0.5, 2.0)
 
+# Crops of detected panels: margin around the box (fraction of its size,
+# each side), for boxes cut a bit short, and the short side the crop is
+# scaled up to, so small panels reach a legible text size.
+CROP_MARGIN = 0.15
+CROP_MIN_SIDE = 480
+# "any": a nutrient read anywhere in a crop counts; "anchor": only in crops
+# where "ALTO EM" is also read.
+CROP_RULE = "any"
+
 
 @dataclass
 class FrontResult:
@@ -50,6 +67,7 @@ class FrontResult:
     anchors: list[Word] = field(default_factory=list)
     panel: list[Word] = field(default_factory=list)
     words: list[Word] = field(default_factory=list)
+    boxes: list = field(default_factory=list)  # detector.Box, method "yolo"
 
     @property
     def has_warning(self):
@@ -106,9 +124,74 @@ def find_warnings(
     return FrontResult(warnings, anchors, panel, words)
 
 
-def read_front(image, scope=SCOPE) -> FrontResult:
-    if isinstance(image, str):
-        path, image = image, cv2.imread(image)
+def crop_panel(image, box, margin=CROP_MARGIN, min_side=CROP_MIN_SIDE):
+    """Crop of the box with a margin, scaled so its short side is at least
+    min_side. Returns the crop, its origin in the photo and the scale."""
+    height, width = image.shape[:2]
+    mx, my = margin * box.w, margin * box.h
+    x0, y0 = max(int(box.x - mx), 0), max(int(box.y - my), 0)
+    x1 = min(int(box.x + box.w + mx), width)
+    y1 = min(int(box.y + box.h + my), height)
+    crop = image[y0:y1, x0:x1]
+    scale = max(min_side / max(min(crop.shape[:2]), 1), 1.0)
+    if scale > 1:
+        crop = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    return crop, x0, y0, scale
+
+
+def read_panel(image, box, margin=CROP_MARGIN, min_side=CROP_MIN_SIDE):
+    """RapidOCR lines of one detected panel, in photo coordinates."""
+    crop, x0, y0, scale = crop_panel(image, box, margin, min_side)
+    return [
+        Word(
+            w.text,
+            int(x0 + w.x / scale),
+            int(y0 + w.y / scale),
+            int(w.w / scale),
+            int(w.h / scale),
+            w.conf,
+        )
+        for w in read_words_rapidocr(crop)
+    ]
+
+
+def find_warnings_in_panels(
+    panels, boxes=(), rule=CROP_RULE, keys=KEYS, not_anchors=NOT_ANCHORS
+) -> FrontResult:
+    """`panels`: the lines read in each detected panel. A crop reading only
+    the Spanish "ALTO EN" isn't an RDC 429/2020 warning."""
+    kept, anchors = [], []
+    for words in panels:
+        texts = [normalize(w.text) for w in words]
+        crop_anchors = [w for w, t in zip(words, texts) if is_anchor(t, not_anchors)]
+        spanish = any(k in t for t in texts for k in not_anchors)
+        if (rule == "anchor" or spanish) and not crop_anchors:
+            continue
+        kept += words
+        anchors += crop_anchors
+
+    texts = [normalize(w.text) for w in kept]
+    warnings = {
+        nutrient: any(contains(text, key) for text in texts for key in alternatives)
+        for nutrient, alternatives in keys.items()
+    }
+    every = [w for words in panels for w in words]
+    return FrontResult(warnings, anchors, kept, every, list(boxes))
+
+
+def read_front(image, method="ocr", scope=SCOPE, model=None) -> FrontResult:
+    """Which warnings the front photo shows. `image`: path or BGR array;
+    `method`: "ocr" (whole photo) or "yolo" (detected panels)."""
+    if isinstance(image, (str, Path)):
+        path, image = image, cv2.imread(str(image))
         if image is None:
             raise FileNotFoundError(path)
-    return find_warnings(read_words_rapidocr(image), scope)
+    if method == "ocr":
+        return find_warnings(read_words_rapidocr(image), scope)
+    if method == "yolo":
+        from vision.front.detector import MODEL_PATH, detect_panels
+
+        boxes = detect_panels(image, model or MODEL_PATH)
+        panels = [read_panel(image, box) for box in boxes]
+        return find_warnings_in_panels(panels, boxes)
+    raise ValueError(f"unknown method {method!r}")

@@ -41,9 +41,29 @@ tqdm = "==4.70.1"
 black = "==25.1.0"
 pre-commit = "==4.2.0"
 
+# Training the warning panel detector (src/vision/front/train_detector.py):
+# ultralytics + torch (CUDA wheels), several GB, so in an environment of
+# its own; the default environment runs the trained model on ONNX Runtime.
+# The headless build of ultralytics, so there is a single OpenCV (as above).
+[feature.detector]
+platforms = ["linux-64"]
+
+[feature.detector.pypi-dependencies]
+ultralytics-opencv-headless = "==8.4.192"
+torch = "==2.14.1"
+torchvision = "==0.29.1"
+# ONNX export (ultralytics would otherwise pip-install them at export).
+onnx = "==1.23.2"
+onnxslim = "==0.1.98"
+
+[feature.detector.tasks]
+train-detector = "python src/vision/front/train_detector.py"
+
 [environments]
 default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default" }
+# Own solve group: its packages don't move the default environment's pins.
+detector = { features = ["detector"] }
 
 [tasks]
 download = "python src/ingestion/download_dataset.py"
