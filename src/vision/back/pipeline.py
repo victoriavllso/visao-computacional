@@ -23,6 +23,7 @@ from vision.back.parse import (
     is_unit,
     parse_number,
     parse_table,
+    plausible,
     value_in_column,
 )
 
@@ -193,7 +194,9 @@ def refine(clean, reading):
 
         anchor = Word("", int(x) - 1, int(cy - half), 1, int(2 * half))
         value = value_in_column(numbers, anchor, reading.headers)
-        values[nutrient] = value if value is not None else parse_number(numbers[0].text)
+        value = value if value is not None else parse_number(numbers[0].text)
+        if value is not None and plausible(nutrient, value):
+            values[nutrient] = value
 
     if not values:
         return reading

@@ -57,6 +57,24 @@ DIGIT_FIXES = str.maketrans({"O": "0", "o": "0", "l": "1", "I": "1"})
 # Punctuation OCR attaches to numbers: quotes, bars, stars from dirt or lines.
 NUMBER_JUNK = "()[]{}|:;*.,'\"“”‘’`´~^_-–—!¡"
 NUMBER = re.compile(r"^[<≤]?(\d+(?:[.,]\d+)?)(mg|g|ml)?$")
+# Brazilian tables write decimals with a comma and may group thousands with
+# a dot: "1.180 mg" is 1180 (dev: two sodium values read as 1.18 and 1.047).
+THOUSANDS = re.compile(r"^[1-9]\d{0,2}\.\d{3}$")
+
+# Physical limits per 100 g/ml: no nutrient weighs more than the food, and
+# pure salt has ~39,000 mg of sodium per 100 g. A larger reading is an OCR
+# error (digits merged, the %VD column), not a value: on dev, 6 of the 21
+# products wrongly called non-compliant came from readings like 477 g of
+# saturated fat or 411,415 mg of sodium.
+MAX_PER_100 = {
+    Nutrient.ADDED_SUGARS: 100.0,
+    Nutrient.SATURATED_FAT: 100.0,
+    Nutrient.SODIUM: 40000.0,
+}
+
+
+def plausible(nutrient, value):
+    return 0 <= value <= MAX_PER_100[nutrient]
 
 
 def normalize(text):
@@ -76,7 +94,12 @@ def parse_number(text):
         return None
 
     match = NUMBER.match(text) or NUMBER.match(text.translate(DIGIT_FIXES))
-    return float(match.group(1).replace(",", ".")) if match else None
+    if not match:
+        return None
+    number = match.group(1)
+    if THOUSANDS.match(number):
+        number = number.replace(".", "")
+    return float(number.replace(",", "."))
 
 
 def group_rows(words):
@@ -298,7 +321,8 @@ def parse_table(words) -> Reading:
                 value = value_in_column(words, label, headers)
             if value is None:
                 value = value_near(words, label)
-            if value is not None:
+            # An impossible amount is a misreading: try the other rows.
+            if value is not None and plausible(nutrient, value):
                 values[nutrient] = value
                 matches[nutrient] = (" ".join(w.text for w in row), value)
                 break
