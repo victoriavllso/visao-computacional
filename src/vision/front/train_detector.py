@@ -133,6 +133,7 @@ def train(name, config, args):
         degrees=10.0,
         plots=False,
         verbose=False,
+        cache="ram",  # the shared machine is short of CPU for decoding
     )
     weights = DETECTOR_DIR / "runs" / args.tag / name / "weights" / "last.pt"
     model = YOLO(str(weights))
