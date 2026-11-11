@@ -11,7 +11,7 @@ to the previous, to measure what it brings.
 Method "yolo" (YOLO + OCR): the detector boxes the panels and RapidOCR reads
 each crop; its variants (YOLO_VARIANTS) change the box score threshold and
 the crop rule on the same boxes and crops. On dev each photo is scored by
-the cross-validation model that didn't train on it (train_detector.py); on
+the cross-validation model that didn't train on it (training/front_detector.py); on
 val, by the final model. The report adds the detector's box metrics against
 the labeled boxes, and the time per photo of each method.
 
@@ -55,8 +55,13 @@ from utils.constants import (
 from utils.logger import Logger
 from vision.back.ocr import read_words_rapidocr
 from vision.back.parse import Word
-from vision.front.detector import MODEL_PATH, Box, detect_panels, fold_of
-from vision.front.train_detector import DETECTOR_DIR
+from vision.front.detector import (
+    DETECTOR_DIR,
+    MODEL_PATH,
+    Box,
+    detect_panels,
+    fold_of,
+)
 from vision.front.warnings import (
     CROP_MARGIN,
     CROP_MIN_SIDE,

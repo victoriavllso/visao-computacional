@@ -1,7 +1,7 @@
 """Locate the "ALTO EM" warning panels on the front photo with a YOLO
 detector, exported to ONNX so it runs on ONNX Runtime (already used by the
 OCR): ultralytics and torch are only needed to train it
-(train_detector.py, pixi environment `detector`).
+(src/training/front_detector.py, pixi environment `detector`).
 
 One class: the warning panel (the black box with the magnifier, "ALTO EM"
 and up to three nutrients), as boxed in the front labels.
@@ -15,9 +15,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from utils.constants import PROJECT_ROOT
+from utils.constants import DATA_DIR, PROJECT_ROOT
 
 MODEL_PATH = PROJECT_ROOT / "models" / "front_detector.onnx"
+# Training data, runs and the cross-validation models.
+DETECTOR_DIR = DATA_DIR / "detector"
 # Low on purpose: the OCR of the crop decides, so a doubtful box costs one
 # OCR call, a missed one a missed warning (dev cross-validation, README).
 MIN_SCORE = 0.1

@@ -41,7 +41,7 @@ tqdm = "==4.70.1"
 black = "==25.1.0"
 pre-commit = "==4.2.0"
 
-# Training the warning panel detector (src/vision/front/train_detector.py):
+# Training the warning panel detector (src/training/front_detector.py):
 # ultralytics + torch (CUDA wheels), several GB, so in an environment of
 # its own; the default environment runs the trained model on ONNX Runtime.
 # The headless build of ultralytics, so there is a single OpenCV (as above).
@@ -57,7 +57,7 @@ onnx = "==1.23.2"
 onnxslim = "==0.1.98"
 
 [feature.detector.tasks]
-train-detector = "python src/vision/front/train_detector.py"
+train-detector = "python src/training/front_detector.py"
 
 [environments]
 default = { solve-group = "default" }

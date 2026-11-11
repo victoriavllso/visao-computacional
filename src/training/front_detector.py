@@ -25,24 +25,22 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
 import cv2
 import pandas as pd
 
 from labeling.labels import load_labels
 from utils.constants import (
-    DATA_DIR,
     FILTER_PAIRS_OUTPUT_FILE,
     FRONT_LABELS_DIR,
     IMAGES_OUTPUT_DIR,
 )
 from utils.logger import Logger
-from vision.front.detector import FOLDS, MODEL_PATH, fold_of
+from vision.front.detector import DETECTOR_DIR, FOLDS, MODEL_PATH, fold_of
 
 log = Logger("train detector")
 
-DETECTOR_DIR = DATA_DIR / "detector"
 DATASET_DIR = DETECTOR_DIR / "dataset"
 # Training images are re-encoded at this size: enough for imgsz up to 1280,
 # and it bakes the EXIF orientation in (the boxes were drawn on the
