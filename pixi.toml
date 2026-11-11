@@ -52,6 +52,7 @@ test = "python -m pytest tests"
 label = "python src/labeling/server.py"
 compact-labels = "python src/labeling/labels.py --compact"
 eval = "python src/evaluation/back.py"
+eval-front = "python src/evaluation/front.py"
 
 [feature.dev.tasks]
 hooks = "pre-commit install"
