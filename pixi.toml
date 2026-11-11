@@ -44,6 +44,7 @@ pre-commit = "==4.2.0"
 [environments]
 default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default" }
+web = { features = ["web"], solve-group = "default" }
 
 [tasks]
 download = "python src/ingestion/download_dataset.py"
@@ -55,3 +56,15 @@ eval = "python src/evaluation/back.py"
 
 [feature.dev.tasks]
 hooks = "pre-commit install"
+
+# The app (web/README.md). A separate environment so the default one, used
+# by the pipelines and the evaluation runs, stays light.
+[feature.web.pypi-dependencies]
+fastapi = "==0.162.4"
+# Form uploads (FastAPI's UploadFile).
+python-multipart = "==0.0.33"
+uvicorn = "==0.54.0"
+
+[feature.web.tasks]
+app = "uvicorn app.main:app --app-dir web --host 127.0.0.1 --port 8000"
+test-web = "python -m pytest web/tests"
