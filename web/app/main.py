@@ -33,7 +33,9 @@ def index():
 def with_photos(entry: dict) -> dict:
     """Links to the photos the analysis has (no front when only the table
     was checked)."""
-    base = f"/api/analyses/{entry['id']}/photos"
+    # Relative: the app may be served under a prefix, e.g. behind
+    # JupyterHub's proxy (/user/<name>/proxy/8000/).
+    base = f"api/analyses/{entry['id']}/photos"
     entry["photos"] = {
         side: {variant: f"{base}/{side}/{variant}" for variant in ("view", "thumb")}
         for side in storage.SIDES

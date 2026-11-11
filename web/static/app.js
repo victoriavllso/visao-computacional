@@ -1,4 +1,6 @@
 // Single page with hash routes: #/ (new analysis), #/historico, #/analise/<id>.
+// URLs are relative (no leading /), so the app also works under a prefix,
+// e.g. behind JupyterHub's proxy.
 "use strict";
 
 const NUTRIENTS = [
@@ -96,12 +98,12 @@ async function route() {
     if (match) {
       show("result");
       $("#result").innerHTML = '<p class="muted">Carregando…</p>';
-      renderResult(await api(`/api/analyses/${match[1]}`));
+      renderResult(await api(`api/analyses/${match[1]}`));
       document.title = "Resultado · Confere Rótulo";
     } else if (hash === "#/historico") {
       show("history");
       $("#history").innerHTML = '<p class="muted">Carregando…</p>';
-      renderHistory(await api("/api/analyses"));
+      renderHistory(await api("api/analyses"));
       document.title = "Histórico · Confere Rótulo";
     } else {
       show("analyze");
@@ -178,7 +180,7 @@ async function submitAnalysis(event) {
   $("#analyze-error").hidden = true;
   $("#busy").hidden = false;
   try {
-    const entry = await api("/api/analyses", { method: "POST", body: form });
+    const entry = await api("api/analyses", { method: "POST", body: form });
     resetForm();
     location.hash = `#/analise/${entry.id}`;
   } catch (error) {
@@ -279,7 +281,7 @@ function renderResult(entry) {
     </section>
 
     <div class="actions">
-      <a class="button primary" href="/api/analyses/${entry.id}/export" download>${icon("download", "")} Exportar JSON</a>
+      <a class="button primary" href="api/analyses/${entry.id}/export" download>${icon("download", "")} Exportar JSON</a>
       <a class="button" href="#/">Nova análise</a>
       <button type="button" class="button danger" data-delete="${entry.id}">${icon("trash", "")} Excluir</button>
     </div>`;
@@ -317,7 +319,7 @@ function renderHistory(entries) {
 async function deleteAnalysis(id) {
   if (!confirm("Excluir esta análise e suas fotos? Não é possível desfazer.")) return;
   try {
-    await api(`/api/analyses/${id}`, { method: "DELETE" });
+    await api(`api/analyses/${id}`, { method: "DELETE" });
   } catch (error) {
     alert(error.message);
     return;
