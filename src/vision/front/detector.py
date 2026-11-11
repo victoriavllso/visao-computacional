@@ -21,7 +21,9 @@ MODEL_PATH = PROJECT_ROOT / "models" / "front_detector.onnx"
 # Training data, runs and the cross-validation models.
 DETECTOR_DIR = DATA_DIR / "detector"
 # Low on purpose: the OCR of the crop decides, so a doubtful box costs one
-# OCR call, a missed one a missed warning (dev cross-validation, README).
+# OCR call, a missed one a missed warning. All three right on dev
+# (cross-validation): 0.05 / 0.1 / 0.25 / 0.5 → 97.8 / 97.6 / 97.3 / 97.3%;
+# at 0.05, 14% of the boxes are false (an OCR call each) for 1 photo.
 MIN_SCORE = 0.1
 NMS_IOU = 0.5
 # Dev photos are split into folds by barcode for cross-validation: each

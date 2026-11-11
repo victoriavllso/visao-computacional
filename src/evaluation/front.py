@@ -57,6 +57,7 @@ from vision.back.ocr import read_words_rapidocr
 from vision.back.parse import Word
 from vision.front.detector import (
     DETECTOR_DIR,
+    MIN_SCORE,
     MODEL_PATH,
     Box,
     detect_panels,
@@ -96,18 +97,20 @@ VARIANTS = {
 }
 OCR_DEFAULT = "+not_spanish"
 
-# YOLO + OCR: box score threshold and crop rule on the same boxes and
-# crops; "+ocr" also takes what the whole-photo OCR finds (costs both).
+# YOLO + OCR: box score threshold, crop rule and match similarity on the
+# same boxes and crops; the default (`yolo`) is detector.MIN_SCORE and the
+# warnings.CROP_* settings. "+ocr" also takes what the whole-photo OCR
+# finds (costs both methods).
+YOLO_DEFAULT = "yolo"
 YOLO_VARIANTS = {
+    "yolo": dict(min_score=MIN_SCORE),
     "yolo_s0.05": dict(min_score=0.05),
-    "yolo_s0.1": dict(min_score=0.1),
     "yolo_s0.25": dict(min_score=0.25),
     "yolo_s0.5": dict(min_score=0.5),
-    "yolo_s0.1_anchor": dict(min_score=0.1, rule="anchor"),
-    "yolo_s0.1_sim0.7": dict(min_score=0.1, min_similarity=0.7),
-    "yolo_s0.1_sim0.6": dict(min_score=0.1, min_similarity=0.6),
-    "yolo_s0.05_sim0.7": dict(min_score=0.05, min_similarity=0.7),
-    "yolo_s0.1+ocr": dict(min_score=0.1, union=True),
+    "yolo_sim0.8": dict(min_score=MIN_SCORE, min_similarity=0.8),
+    "yolo_sim0.6": dict(min_score=MIN_SCORE, min_similarity=0.6),
+    "yolo_anchor": dict(min_score=MIN_SCORE, rule="anchor"),
+    "yolo+ocr": dict(min_score=MIN_SCORE, union=True),
 }
 
 

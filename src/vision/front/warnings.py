@@ -56,15 +56,19 @@ PANEL_HEIGHT_RATIO = (0.5, 2.0)
 
 # Crops of detected panels: margin around the box (fraction of its size,
 # each side), for boxes cut a bit short, and the short side the crop is
-# scaled up to, so small panels reach a legible text size.
+# scaled up to, so small panels reach a legible text size. On dev, all
+# three right: margin 0.05 / 0.15 / 0.3 → 97.6 / 97.6 / 97.8%; short side
+# none / 480 / 960 → 97.3 / 97.6 / 97.1% (1 or 2 photos: noise).
 CROP_MARGIN = 0.15
 CROP_MIN_SIDE = 480
 # "any": a nutrient read anywhere in a crop counts; "anchor": only in crops
-# where "ALTO EM" is also read.
+# where "ALTO EM" is also read (dev: 97.3% → 95.9%, the anchor is often
+# misread when the nutrients aren't).
 CROP_RULE = "any"
 # Inside a detected panel the only words are "ALTO EM" and the three
-# nutrients, so a looser match is safe there.
-CROP_MIN_SIMILARITY = MIN_SIMILARITY
+# nutrients, so a looser match is safe there ('CATURA', 'ADICUCNADO'). On
+# dev: 0.8 → 97.3%, 0.7 → 97.6%, 0.6 → 82.2% (false matches).
+CROP_MIN_SIMILARITY = 0.7
 
 
 @dataclass
