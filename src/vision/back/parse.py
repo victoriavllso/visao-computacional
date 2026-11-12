@@ -41,6 +41,11 @@ class Reading:
     # Where each found label's values start: (x, row center y, text height).
     value_spans: dict = field(default_factory=dict)
     headers: list = field(default_factory=list)
+    # Which rule gave each value: "column" ('100 g' column on its row),
+    # "first_right", "column_rows" (column, nearby rows), "near",
+    # "not_significant", "refine"; after combining engines, prefixed with
+    # the engine ("rapidocr:column").
+    sources: dict = field(default_factory=dict)
 
 
 # Distinctive words of each label (full and abbreviated: 'Aç. adic.',
@@ -298,7 +303,7 @@ def not_significant(rows):
 def parse_table(words) -> Reading:
     rows = group_rows(words)
     headers = find_headers(rows)
-    values, matches, labels, spans, value_rows = {}, {}, set(), {}, {}
+    values, matches, labels, spans, value_rows, sources = {}, {}, set(), {}, {}, {}
     # The sentence mentions the labels; it isn't a table row.
     table_rows = [row for row in rows if NOT_SIGNIFICANT not in row_text(row)]
 
@@ -314,17 +319,18 @@ def parse_table(words) -> Reading:
             # Same row first; other words only when the row has no value
             # (curved tables push values out of their row).
             label = row[index]
-            value = value_in_column(row[index + 1 :], label, headers)
+            value, rule = value_in_column(row[index + 1 :], label, headers), "column"
             if value is None:
-                value = value_after(row, index)
+                value, rule = value_after(row, index), "first_right"
             if value is None:
-                value = value_in_column(words, label, headers)
+                value, rule = value_in_column(words, label, headers), "column_rows"
             if value is None:
-                value = value_near(words, label)
+                value, rule = value_near(words, label), "near"
             # An impossible amount is a misreading: try the other rows.
             if value is not None and plausible(nutrient, value):
                 values[nutrient] = value
                 value_rows[nutrient] = rows.index(row)
+                sources[nutrient] = rule
                 matches[nutrient] = (" ".join(w.text for w in row), value)
                 break
 
@@ -341,6 +347,7 @@ def parse_table(words) -> Reading:
         if nutrient not in values or value_rows[nutrient] >= sentence:
             values[nutrient] = 0.0
             matches[nutrient] = ("não contém quantidades significativas", 0.0)
+            sources[nutrient] = "not_significant"
 
     facts = NutritionFacts(
         basis=headers[0].basis if headers else None,
@@ -354,4 +361,5 @@ def parse_table(words) -> Reading:
         labels=labels,
         value_spans=spans,
         headers=headers,
+        sources=sources,
     )

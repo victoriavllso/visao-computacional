@@ -195,8 +195,14 @@ def _read(image, locate, preprocess, debug_dir) -> BackResult:
     return result
 
 
-def combine(primary, fallback):
+def combine(primary, fallback, names=("rapidocr", "tesseract")):
     """Each value from `primary`, from `fallback` where `primary` has none."""
+    sources = {}
+    for nutrient in Nutrient:
+        for name, reading in zip(names, (primary, fallback)):
+            if reading.facts.amount(nutrient) is not None:
+                sources[nutrient] = f"{name}:{reading.sources.get(nutrient, '?')}"
+                break
     facts = NutritionFacts(
         basis=primary.facts.basis or fallback.facts.basis,
         **{
@@ -214,6 +220,7 @@ def combine(primary, fallback):
         labels=primary.labels | fallback.labels,
         matches={**fallback.matches, **primary.matches},
         headers=primary.headers or fallback.headers,
+        sources=sources,
     )
 
 
@@ -251,4 +258,5 @@ def refine(clean, reading):
         Nutrient.SODIUM: "sodium_mg",
     }
     facts = replace(reading.facts, **{fields[n]: v for n, v in values.items()})
-    return replace(reading, facts=facts)
+    sources = {**reading.sources, **{n: "refine" for n in values}}
+    return replace(reading, facts=facts, sources=sources)

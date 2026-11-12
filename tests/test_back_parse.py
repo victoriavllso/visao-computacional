@@ -384,3 +384,34 @@ def test_not_significant_sentence_wins_over_a_number_beside_it():
     facts = parse_table(words).facts
     assert facts.saturated_fat_g == 0.0
     assert facts.sodium_mg == 8.6
+
+
+def test_sources_say_which_rule_gave_each_value():
+    from rules.anvisa import Nutrient
+
+    words = [
+        *row(0, (300, "100"), (340, "g")),
+        *row(40, (0, "Sódio"), (60, "(mg)"), (300, "120")),
+        *row(80, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (500, "4,7")),
+        *sentence(
+            120, "Não contém quantidades significativas de açúcares adicionados."
+        ),
+    ]
+    sources = parse_table(words).sources
+    assert sources[Nutrient.SODIUM] == "column"
+    assert sources[Nutrient.SATURATED_FAT] == "first_right"
+    assert sources[Nutrient.ADDED_SUGARS] == "not_significant"
+
+
+def test_combine_names_the_engine_of_each_value():
+    from rules.anvisa import Nutrient
+    from vision.back.pipeline import combine
+
+    learned = parse_table(row(0, (0, "Sódio"), (60, "(mg)"), (300, "120")))
+    classical = parse_table(
+        row(0, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (300, "4,7"))
+    )
+    sources = combine(learned, classical).sources
+    assert sources[Nutrient.SODIUM] == "rapidocr:first_right"
+    assert sources[Nutrient.SATURATED_FAT] == "tesseract:first_right"
+    assert Nutrient.ADDED_SUGARS not in sources
