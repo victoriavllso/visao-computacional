@@ -242,16 +242,18 @@ Each metric counts only products whose true value or decision is known. Per nutr
 
 ### Final score: validation set (held out, hand-labeled)
 
-All 397 val products labeled by hand (282 tables, 36 linear, 46 old format, 33 without a readable table), on the pinned 2026-10-18 snapshot, measured with the pixi environment. Nothing was tuned on val, so this is the honest estimate:
+All 399 val products labeled by hand (284 tables, 36 linear, 46 old format, 33 without a readable table), on the pinned 2026-10-18 snapshot, with the 2026-11-12 back pipeline (parser fixes, rotated photos, no nearby-row guesses; all decided on dev). Nothing was tuned on val, so this is the honest estimate:
 
-| | Value |
-| :--- | ---: |
-| **Readable photos with all three warning decisions right** | **71.6%** |
-| Decision right: added sugars / saturated fat / sodium | 85.2% / 81.6% / 82.7% |
-| When the pipeline says "readable": all three right | 73.3% |
-| Photo type accuracy | 81.9% |
-| Readable tables left without an answer | 2 of 282 |
-| Old-format labels wrongly checked as tables | 17 of 46 |
+| | 2026-11-04 | **2026-11-12** |
+| :--- | ---: | ---: |
+| **Readable photos with all three warning decisions right** | 71.6% | **71.8%** |
+| Decision right: added sugars / saturated fat / sodium | 85.2% / 81.6% / 82.7% | 86.6% / 83.3% / 82.2% |
+| When the pipeline says "readable": all three right | 73.3% | 73.2% |
+| Photo type accuracy | 81.9% | 81.7% |
+| Readable tables left without an answer | 2 of 282 | 2 of 284 |
+| Old-format labels wrongly checked as tables | 17 of 46 | 18 of 46 |
+
+The 2026-11-12 changes count an unread value as an error here (they turn guesses into unknowns), so the back's score barely moves; their effect shows in the verdicts below ("Whole system").
 
 The learned OCR library made the difference: on the same photos, labels and code, `rapidocr_onnxruntime` 1.2.3 gave 57.1% (dev: 62.8%) and `rapidocr` 3.10 gives 71.6% (dev: 77.4%), +14.5 points. The gain is in reading values (added sugars read right: 62% → 81%); the old library's text detector merged neighboring cells into one number (`338 | 338` → `338338`). Old-format detection is still the weakest point.
 
@@ -459,7 +461,18 @@ Of the 20 readings it changed on dev, 5 are thousands fixed and 15 impossible va
 
 **Where the values come from.** Recorded per value (`<nutrient>_source` in the back CSV), on readable dev photos: the label's own row is right 90–95% of the time (RapidOCR and Tesseract alike: Tesseract's 224 values gave 214 right decisions and 10 wrong, so its fallback stays), the "não contém" sentence 97–100%, but the rules beyond the row only 12–36%: the `100 g` column on nearby rows, the nearest number, and the row-by-row re-read. Those caused 6 of the 13 remaining false accusations, and their "right" decisions were mostly a wrong value on the right side of the limit. Turned off (`parse.NEARBY_ROWS`, `pipeline.REFINE`), measured end to end: false accusations 13 → 7, violations caught unchanged (and one fewer called compliant), 13 more compliant products answered inconclusive, and the reading ~25% faster. The back's "all three right" drops (79.6 → 77.7%) because it counts an unknown value as wrong; the verdict, which says "inconclusive" for it, is what the app shows.
 
-Val is kept for the final check.
+**Val** (held out, once, 2026-11-12), 391 products with both sides labeled:
+
+| Labels \ App | compliant | inconclusive | non-compliant |
+| :--- | ---: | ---: | ---: |
+| **compliant** (271) | **188** | 67 | 16 |
+| **inconclusive** (89) | 7 | **74** | 8 |
+| **non-compliant** (31) | 3 | 8 | **20** |
+
+- Same verdict as the labels: **72.1%**; when the app decides (242 products): **86.0%** right.
+- Violations: 20 of 31 caught (64.5%), 3 called compliant.
+- False accusations: 16 of 271 compliant products (5.9%), more than on dev (2.3%); of the app's 44 "non-compliant" answers, 20 are right (45%). The changes that cut them on dev were chosen from dev's errors, and val's photos have other ones: they are the next thing to look at, on dev.
+- More compliant products come out inconclusive than on dev (25% vs 19%), and far fewer truly inconclusive ones (old-format tables) come out compliant (7 of 89 vs 53 of 126 on dev).
 
 ## 📊 Dataset Details
 
