@@ -3,13 +3,14 @@
 photo ─► locate + straighten table ─► OCR ─► parse rows ─► NutritionFacts
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 import cv2
 
 from rules.anvisa import Nutrient, NutritionFacts
 from vision.back.classify import Features, PhotoType, classify, features
 from vision.back.locate import Table, locate_table
+from vision.back.orient import osd_rotation, rotate, vertical_text
 from vision.back.ocr import (
     TARGET_TEXT_HEIGHT,
     prepare,
@@ -49,6 +50,9 @@ GATE_LEARNED_OCR = True
 # 10 uncertain photos were 6 old format, 3 tables, 1 no table, and none of
 # the 3 tables was read right: abstain.
 UNCERTAIN_AS = PhotoType.OLD_FORMAT
+# Turn photos taken on their side or upside down before reading them
+# (vision/back/orient.py).
+ORIENT = True
 
 
 @dataclass
@@ -57,6 +61,10 @@ class BackResult:
     table: Table | None
     photo_type: PhotoType
     features: Features
+    # Clockwise degrees the photo was turned before reading it.
+    rotation: int = 0
+    # Lines read by the learned OCR, when it ran (orientation cue).
+    lines: list = field(default_factory=list, repr=False)
 
     @property
     def readable(self):
@@ -65,7 +73,9 @@ class BackResult:
         return self.photo_type.readable
 
 
-def read_back(image, locate=True, preprocess=True, debug_dir=None) -> BackResult:
+def read_back(
+    image, locate=True, preprocess=True, debug_dir=None, orient=ORIENT
+) -> BackResult:
     """`locate` and `preprocess` switch the classical steps off, to measure
     what each one adds.  `debug_dir`, when set, saves intermediate images and
     a JSON summary to that directory."""
@@ -74,6 +84,29 @@ def read_back(image, locate=True, preprocess=True, debug_dir=None) -> BackResult
         if image is None:
             raise FileNotFoundError(path)
 
+    rotation = osd_rotation(image) if orient else 0
+    result = _read(rotate(image, rotation), locate, preprocess, debug_dir)
+    if orient and not rotation and vertical_text(result.lines):
+        # On its side and OSD wasn't sure which way: the reading tells.
+        for degrees in (90, 270):
+            candidate = _read(rotate(image, degrees), locate, preprocess, None)
+            if reading_score(candidate) > reading_score(result):
+                result, rotation = candidate, degrees
+    return replace(result, rotation=rotation)
+
+
+def reading_score(result):
+    """How well a photo was read: the right way up gives a readable type, the
+    '100 g' header and values; text turned the wrong way gives fewer."""
+    facts = result.reading.facts
+    values = sum(
+        value is not None
+        for value in (facts.added_sugars_g, facts.saturated_fat_g, facts.sodium_mg)
+    )
+    return (result.readable, values + bool(result.reading.headers))
+
+
+def _read(image, locate, preprocess, debug_dir) -> BackResult:
     if debug_dir is not None:
         from pathlib import Path
 
@@ -125,6 +158,7 @@ def read_back(image, locate=True, preprocess=True, debug_dir=None) -> BackResult
     # old label. The fast OCR reading little text isn't evidence of no table
     # (on dev, 20 of 116 tables were rejected that way).
     needs_learned = photo_type is not PhotoType.OLD_FORMAT
+    learned = words if ENGINE == "rapidocr" else []
     if ENGINE == "combined" and (needs_learned or not GATE_LEARNED_OCR):
         learned = read_words_rapidocr(crop)
         reading = combine(parse_table(learned), reading)
@@ -140,7 +174,7 @@ def read_back(image, locate=True, preprocess=True, debug_dir=None) -> BackResult
         # Still no format evidence with all the text read.
         photo_type = UNCERTAIN_AS
 
-    result = BackResult(reading, table, photo_type, photo_features)
+    result = BackResult(reading, table, photo_type, photo_features, lines=learned)
 
     if debug_dir is not None:
         from vision.back.debug import save_parsed_values, save_summary

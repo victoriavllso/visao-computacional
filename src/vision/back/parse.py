@@ -298,7 +298,7 @@ def not_significant(rows):
 def parse_table(words) -> Reading:
     rows = group_rows(words)
     headers = find_headers(rows)
-    values, matches, labels, spans = {}, {}, set(), {}
+    values, matches, labels, spans, value_rows = {}, {}, set(), {}, {}
     # The sentence mentions the labels; it isn't a table row.
     table_rows = [row for row in rows if NOT_SIGNIFICANT not in row_text(row)]
 
@@ -324,11 +324,21 @@ def parse_table(words) -> Reading:
             # An impossible amount is a misreading: try the other rows.
             if value is not None and plausible(nutrient, value):
                 values[nutrient] = value
+                value_rows[nutrient] = rows.index(row)
                 matches[nutrient] = (" ".join(w.text for w in row), value)
                 break
 
+    # Rows are top to bottom, and the sentence comes after the table rows: a
+    # number for a listed nutrient on or below the sentence's first line was
+    # read from the sentence itself ("gorduras saturadas, gorduras trans" as
+    # a row; dev: 90 g of saturated fat in a drink declaring it
+    # insignificant), so the sentence wins; a number from a row above it
+    # (a table row) still wins over the sentence.
+    sentence = next(
+        (i for i, row in enumerate(rows) if NOT_SIGNIFICANT in row_text(row)), None
+    )
     for nutrient in not_significant(rows):
-        if nutrient not in values:
+        if nutrient not in values or value_rows[nutrient] >= sentence:
             values[nutrient] = 0.0
             matches[nutrient] = ("não contém quantidades significativas", 0.0)
 

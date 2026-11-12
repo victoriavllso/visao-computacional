@@ -358,3 +358,29 @@ def test_a_plausible_row_wins_over_an_impossible_one():
         *row(40, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (260, "4,7")),
     ]
     assert parse_table(words).facts.saturated_fat_g == 4.7
+
+
+def test_not_significant_sentence_wins_over_a_number_beside_it():
+    # The sentence's second line reads like a saturated fat row.
+    words = [
+        *row(0, (0, "Sódio"), (200, "(mg)"), (260, "8,6")),
+        *row(
+            40,
+            (0, "Não"),
+            (60, "contém"),
+            (160, "quantidades"),
+            (300, "significativas"),
+            (480, "de"),
+        ),
+        *row(
+            80,
+            (0, "gorduras"),
+            (100, "totais,"),
+            (200, "gorduras"),
+            (300, "saturadas,"),
+            (420, "90"),
+        ),
+    ]
+    facts = parse_table(words).facts
+    assert facts.saturated_fat_g == 0.0
+    assert facts.sodium_mg == 8.6
