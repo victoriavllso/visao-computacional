@@ -24,6 +24,8 @@ OFF_EXPECTED_WARNINGS_FILE: Path = (
 
 # Hand labels are versioned (outside data/), to share with the team.
 BACK_LABELS_DIR: Path = PROJECT_ROOT / "labels" / "back"
+# Warnings seen on the front photo, and the boxes around them.
+FRONT_LABELS_DIR: Path = PROJECT_ROOT / "labels" / "front"
 
 # Selected-image keys used for each side of the package. Open Food Facts has
 # no "back" key: the back of the package is the nutrition table photo.

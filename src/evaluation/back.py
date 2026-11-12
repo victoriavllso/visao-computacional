@@ -99,6 +99,8 @@ def evaluate_product(args):
     for nutrient in Nutrient:
         name = nutrient.value
         row[f"{name}_read"] = read.amount(nutrient)
+        # Engine and rule that gave the value (vision.back.parse.Reading).
+        row[f"{name}_source"] = result.reading.sources.get(nutrient)
         row[f"{name}_label"] = nutrient in result.reading.labels
 
     if truth is None:

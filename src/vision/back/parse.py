@@ -41,6 +41,11 @@ class Reading:
     # Where each found label's values start: (x, row center y, text height).
     value_spans: dict = field(default_factory=dict)
     headers: list = field(default_factory=list)
+    # Which rule gave each value: "column" ('100 g' column on its row),
+    # "first_right", "column_rows" (column, nearby rows), "near",
+    # "not_significant", "refine"; after combining engines, prefixed with
+    # the engine ("rapidocr:column").
+    sources: dict = field(default_factory=dict)
 
 
 # Distinctive words of each label (full and abbreviated: 'Aç. adic.',
@@ -57,6 +62,32 @@ DIGIT_FIXES = str.maketrans({"O": "0", "o": "0", "l": "1", "I": "1"})
 # Punctuation OCR attaches to numbers: quotes, bars, stars from dirt or lines.
 NUMBER_JUNK = "()[]{}|:;*.,'\"“”‘’`´~^_-–—!¡"
 NUMBER = re.compile(r"^[<≤]?(\d+(?:[.,]\d+)?)(mg|g|ml)?$")
+# Brazilian tables write decimals with a comma and may group thousands with
+# a dot: "1.180 mg" is 1180 (dev: two sodium values read as 1.18 and 1.047).
+THOUSANDS = re.compile(r"^[1-9]\d{0,2}\.\d{3}$")
+
+# Physical limits per 100 g/ml: no nutrient weighs more than the food, and
+# pure salt has ~39,000 mg of sodium per 100 g. A larger reading is an OCR
+# error (digits merged, the %VD column), not a value: on dev, 6 of the 21
+# products wrongly called non-compliant came from readings like 477 g of
+# saturated fat or 411,415 mg of sodium.
+MAX_PER_100 = {
+    Nutrient.ADDED_SUGARS: 100.0,
+    Nutrient.SATURATED_FAT: 100.0,
+    Nutrient.SODIUM: 40000.0,
+}
+
+
+# Rules beyond the label's own row: the '100 g' column on nearby rows and the
+# nearest number anywhere. On dev their values were right 12-36% of the time
+# (vs 90-95% for the label's own row) and gave 6 of the 13 products wrongly
+# called non-compliant. Off: an unread value is unknown (inconclusive) rather
+# than a guess; false accusations 13 -> 7, violations caught unchanged.
+NEARBY_ROWS = False
+
+
+def plausible(nutrient, value):
+    return 0 <= value <= MAX_PER_100[nutrient]
 
 
 def normalize(text):
@@ -76,7 +107,12 @@ def parse_number(text):
         return None
 
     match = NUMBER.match(text) or NUMBER.match(text.translate(DIGIT_FIXES))
-    return float(match.group(1).replace(",", ".")) if match else None
+    if not match:
+        return None
+    number = match.group(1)
+    if THOUSANDS.match(number):
+        number = number.replace(".", "")
+    return float(number.replace(",", "."))
 
 
 def group_rows(words):
@@ -275,7 +311,7 @@ def not_significant(rows):
 def parse_table(words) -> Reading:
     rows = group_rows(words)
     headers = find_headers(rows)
-    values, matches, labels, spans = {}, {}, set(), {}
+    values, matches, labels, spans, value_rows, sources = {}, {}, set(), {}, {}, {}
     # The sentence mentions the labels; it isn't a table row.
     table_rows = [row for row in rows if NOT_SIGNIFICANT not in row_text(row)]
 
@@ -291,22 +327,35 @@ def parse_table(words) -> Reading:
             # Same row first; other words only when the row has no value
             # (curved tables push values out of their row).
             label = row[index]
-            value = value_in_column(row[index + 1 :], label, headers)
+            value, rule = value_in_column(row[index + 1 :], label, headers), "column"
             if value is None:
-                value = value_after(row, index)
-            if value is None:
-                value = value_in_column(words, label, headers)
-            if value is None:
-                value = value_near(words, label)
-            if value is not None:
+                value, rule = value_after(row, index), "first_right"
+            if value is None and NEARBY_ROWS:
+                value, rule = value_in_column(words, label, headers), "column_rows"
+            if value is None and NEARBY_ROWS:
+                value, rule = value_near(words, label), "near"
+            # An impossible amount is a misreading: try the other rows.
+            if value is not None and plausible(nutrient, value):
                 values[nutrient] = value
+                value_rows[nutrient] = rows.index(row)
+                sources[nutrient] = rule
                 matches[nutrient] = (" ".join(w.text for w in row), value)
                 break
 
+    # Rows are top to bottom, and the sentence comes after the table rows: a
+    # number for a listed nutrient on or below the sentence's first line was
+    # read from the sentence itself ("gorduras saturadas, gorduras trans" as
+    # a row; dev: 90 g of saturated fat in a drink declaring it
+    # insignificant), so the sentence wins; a number from a row above it
+    # (a table row) still wins over the sentence.
+    sentence = next(
+        (i for i, row in enumerate(rows) if NOT_SIGNIFICANT in row_text(row)), None
+    )
     for nutrient in not_significant(rows):
-        if nutrient not in values:
+        if nutrient not in values or value_rows[nutrient] >= sentence:
             values[nutrient] = 0.0
             matches[nutrient] = ("não contém quantidades significativas", 0.0)
+            sources[nutrient] = "not_significant"
 
     facts = NutritionFacts(
         basis=headers[0].basis if headers else None,
@@ -320,4 +369,5 @@ def parse_table(words) -> Reading:
         labels=labels,
         value_spans=spans,
         headers=headers,
+        sources=sources,
     )

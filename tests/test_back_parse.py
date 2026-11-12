@@ -153,6 +153,12 @@ def test_rows_group_despite_small_vertical_offsets():
         ("“29", 29),
         ("367.", 367),
         ("S", None),
+        # Thousands grouped with a dot (Brazilian tables).
+        ("1.180", 1180),
+        ("1.047mg", 1047),
+        ("12.000", 12000),
+        ("0.500", 0.5),
+        ("1.5", 1.5),
     ],
 )
 def test_parse_number(text, expected):
@@ -165,14 +171,20 @@ def test_unit_misread_as_digit_is_not_the_value():
     assert parse_table(words).facts.added_sugars_g == 8.7
 
 
-def test_value_drifted_out_of_the_row_is_still_found():
-    # Curved package: the number sits lower than its label.
+def test_value_drifted_out_of_the_row_is_unknown(monkeypatch):
+    # Curved package: the number sits lower than its label. Nearby rows are
+    # off (parse.NEARBY_ROWS: right 12-36% of the time on dev), so the value
+    # is unknown; with them on, the nearest number is taken.
+    from vision.back import parse
+
     words = [
         Word("Sódio", 0, 100, 50, 20),
         Word("(mg)", 60, 100, 40, 20),
         Word("367", 300, 116, 30, 20),
     ]
 
+    assert parse_table(words).facts.sodium_mg is None
+    monkeypatch.setattr(parse, "NEARBY_ROWS", True)
     assert parse_table(words).facts.sodium_mg == 367
 
 
@@ -333,3 +345,79 @@ def test_not_significant_list_stops_at_the_next_sentence():
     ]
 
     assert parse_table(words).facts.sodium_mg is None
+
+
+def test_impossible_amounts_are_not_values():
+    # %VD and merged digits: 477 g of fat per 100 g can't be.
+    words = [
+        *row(0, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (260, "477")),
+        *row(40, (0, "Sódio"), (200, "(mg)"), (260, "411415")),
+    ]
+    facts = parse_table(words).facts
+    assert facts.saturated_fat_g is None
+    assert facts.sodium_mg is None
+
+
+def test_a_plausible_row_wins_over_an_impossible_one():
+    words = [
+        *row(0, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (260, "477")),
+        *row(40, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (260, "4,7")),
+    ]
+    assert parse_table(words).facts.saturated_fat_g == 4.7
+
+
+def test_not_significant_sentence_wins_over_a_number_beside_it():
+    # The sentence's second line reads like a saturated fat row.
+    words = [
+        *row(0, (0, "Sódio"), (200, "(mg)"), (260, "8,6")),
+        *row(
+            40,
+            (0, "Não"),
+            (60, "contém"),
+            (160, "quantidades"),
+            (300, "significativas"),
+            (480, "de"),
+        ),
+        *row(
+            80,
+            (0, "gorduras"),
+            (100, "totais,"),
+            (200, "gorduras"),
+            (300, "saturadas,"),
+            (420, "90"),
+        ),
+    ]
+    facts = parse_table(words).facts
+    assert facts.saturated_fat_g == 0.0
+    assert facts.sodium_mg == 8.6
+
+
+def test_sources_say_which_rule_gave_each_value():
+    from rules.anvisa import Nutrient
+
+    words = [
+        *row(0, (300, "100"), (340, "g")),
+        *row(40, (0, "Sódio"), (60, "(mg)"), (300, "120")),
+        *row(80, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (500, "4,7")),
+        *sentence(
+            120, "Não contém quantidades significativas de açúcares adicionados."
+        ),
+    ]
+    sources = parse_table(words).sources
+    assert sources[Nutrient.SODIUM] == "column"
+    assert sources[Nutrient.SATURATED_FAT] == "first_right"
+    assert sources[Nutrient.ADDED_SUGARS] == "not_significant"
+
+
+def test_combine_names_the_engine_of_each_value():
+    from rules.anvisa import Nutrient
+    from vision.back.pipeline import combine
+
+    learned = parse_table(row(0, (0, "Sódio"), (60, "(mg)"), (300, "120")))
+    classical = parse_table(
+        row(0, (0, "Gorduras"), (90, "saturadas"), (200, "(g)"), (300, "4,7"))
+    )
+    sources = combine(learned, classical).sources
+    assert sources[Nutrient.SODIUM] == "rapidocr:first_right"
+    assert sources[Nutrient.SATURATED_FAT] == "tesseract:first_right"
+    assert Nutrient.ADDED_SUGARS not in sources

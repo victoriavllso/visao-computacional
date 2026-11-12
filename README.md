@@ -36,8 +36,11 @@ Everything runs inside the pixi environment, through `pixi run <task>` (tasks in
 | `pixi run pipeline` | Run the full processing pipeline |
 | `pixi run test` | Run the unit tests |
 | `pixi run eval --split dev --hand-only` | Evaluate the back pipeline (options below) |
+| `pixi run eval-front --split dev [--method yolo]` | Evaluate the front pipeline ("ALTO EM" warnings) |
+| `pixi run -e detector train-detector` | Train the front warning detector (GPU; environment `detector`, Linux) |
 | `pixi run label` | Open the hand-labeling tool (see [LABELING.md](LABELING.md)) |
 | `pixi run compact-labels` | Merge the hand label files into one, one entry per product |
+| `pixi run -e web app` | Open the web app at http://localhost:8000 (see [web/README.md](web/README.md)) |
 
 Typical first-time flow:
 
@@ -239,16 +242,18 @@ Each metric counts only products whose true value or decision is known. Per nutr
 
 ### Final score: validation set (held out, hand-labeled)
 
-All 397 val products labeled by hand (282 tables, 36 linear, 46 old format, 33 without a readable table), on the pinned 2026-10-18 snapshot, measured with the pixi environment. Nothing was tuned on val, so this is the honest estimate:
+All 399 val products labeled by hand (284 tables, 36 linear, 46 old format, 33 without a readable table), on the pinned 2026-10-18 snapshot, with the 2026-11-12 back pipeline (parser fixes, rotated photos, no nearby-row guesses; all decided on dev). Nothing was tuned on val, so this is the honest estimate:
 
-| | Value |
-| :--- | ---: |
-| **Readable photos with all three warning decisions right** | **71.6%** |
-| Decision right: added sugars / saturated fat / sodium | 85.2% / 81.6% / 82.7% |
-| When the pipeline says "readable": all three right | 73.3% |
-| Photo type accuracy | 81.9% |
-| Readable tables left without an answer | 2 of 282 |
-| Old-format labels wrongly checked as tables | 17 of 46 |
+| | 2026-11-04 | **2026-11-12** |
+| :--- | ---: | ---: |
+| **Readable photos with all three warning decisions right** | 71.6% | **71.8%** |
+| Decision right: added sugars / saturated fat / sodium | 85.2% / 81.6% / 82.7% | 86.6% / 83.3% / 82.2% |
+| When the pipeline says "readable": all three right | 73.3% | 73.2% |
+| Photo type accuracy | 81.9% | 81.7% |
+| Readable tables left without an answer | 2 of 282 | 2 of 284 |
+| Old-format labels wrongly checked as tables | 17 of 46 | 18 of 46 |
+
+The 2026-11-12 changes count an unread value as an error here (they turn guesses into unknowns), so the back's score barely moves; their effect shows in the verdicts below ("Whole system").
 
 The learned OCR library made the difference: on the same photos, labels and code, `rapidocr_onnxruntime` 1.2.3 gave 57.1% (dev: 62.8%) and `rapidocr` 3.10 gives 71.6% (dev: 77.4%), +14.5 points. The gain is in reading values (added sugars read right: 62% → 81%); the old library's text detector merged neighboring cells into one number (`338 | 338` → `338338`). Old-format detection is still the weakest point.
 
@@ -311,6 +316,163 @@ Tried and dropped (all on full dev, relative to the step they were tested on):
 **Where errors come from** (per nutrient reading, dev): about 40% correct, 7–15% the label isn't found, 13–21% a wrong number is picked, and 23–39% the true value is never produced by the OCR. The last group (OCR misreading digits, decimal commas) is the main limit of Tesseract on these photos, and includes errors in the OFF values themselves: in a manual check of 12 disagreements, 3 were OFF errors and the photo was read correctly. That's why the ground truth is being corrected by hand.
 
 ---
+
+## 🔖 Front Pipeline ("ALTO EM" warnings)
+
+**`src/vision/front/`** answers: which of the three RDC 429/2020 warnings (*açúcar adicionado*, *gordura saturada*, *sódio*) does the front photo show? The warning has a fixed design (a black panel with a magnifier, "ALTO EM" and the nutrients, in one bold font), and two methods read it behind one function:
+
+```python
+from vision.front.warnings import read_front
+
+result = read_front("front.jpg", method="yolo")  # or method="ocr"
+result.warnings   # {Nutrient.ADDED_SUGARS: True, Nutrient.SATURATED_FAT: False, ...}
+result.boxes      # panels found by the detector ("yolo")
+```
+
+```
+"ocr"   photo ─► RapidOCR (whole photo) ─► "ALTO EM" anchor ─► lines near it, same text size ─► nutrient words
+"yolo"  photo ─► YOLO (panel boxes) ─► crop + margin, upscale ─► RapidOCR (crop) ─► nutrient words
+```
+
+- **OCR** (`warnings.py`): RapidOCR reads the whole photo; a line reading "ALTO EM" (fuzzy) is the anchor, and the lines near it with about its text height are the panel (ingredients and claims elsewhere are in other sizes). Each nutrient is any word of its phrase (*adicionad* / *açúcar*, *saturad* / *gordura*, *sódio*), matched with tolerance for OCR errors (similarity ≥ 0.8). Panels with Spanish words (*grasa*, *azúcares*, *calorías*: imported products with the Spanish warning) don't count.
+- **YOLO + OCR** (`detector.py` + `warnings.py`): a YOLO26 nano detector, trained on the hand-drawn panel boxes, finds the panels (one class; one box per panel, not per nutrient); RapidOCR reads each crop (15% margin, short side scaled up to ≥ 480 px), and the nutrients are matched in the crops' text. Inside a detected panel the only words are "ALTO EM" and the nutrients, so the match is looser (similarity ≥ 0.7) and "ALTO EM" doesn't have to be read. The detector runs on ONNX Runtime (already used by the OCR), so the default environment runs it; ultralytics and torch are only needed to train it.
+
+Why a detector, against the classical-first rule of the project: most of the whole-photo OCR's misses are panels where "ALTO EM" isn't read (small or tilted panels; RapidOCR shrinks photos to 2,000 px on the long side, so a small panel's text gets too small), and a crop of the panel at full resolution fixes that. The panel has a fixed design and its boxes were cheap to label (268 products), the best case for a detector. A classical locator of the black panel (threshold + contours + aspect ratio) wasn't tried in this round; it is the natural comparison to add.
+
+**Evaluation** against the front hand labels (see [LABELING.md](LABELING.md), section 3b): scores count the photos labeled "front of the package" (`ok`), whatever they show (no masking); photos whose warning can't be read (`unreadable`) are reported apart, and photos that aren't the front are left out.
+
+```bash
+pixi run eval-front --split dev [--method ocr|yolo] [--workers 32] [--limit N] [--no-cache]
+```
+
+Results go to `data/evaluation/front_<split>_<timestamp>_<tag>/` (CSV per product + Markdown report), linked from `data/evaluation/latest/front_<split>.{csv,md}` (`front_<split>_yolo.*` for YOLO). The OCR lines are cached in `data/cache/front_ocr/` and the detector boxes + crop lines in `data/cache/front_yolo/`, so rule variants are scored on the same reading; `--no-cache` reruns them (to time them). The YOLO report adds the detector's box metrics (IoU 0.5 against the labeled boxes), and every report the time per photo.
+
+**Training the detector** (GPU; the `detector` environment, Linux only, has ultralytics + torch with CUDA, several GB):
+
+```bash
+pixi run -e detector train-detector                         # 5 cross-validation folds + the final model
+pixi run -e detector train-detector --folds all --install   # final model only → models/front_detector.onnx
+```
+
+Only dev photos train it (494 labeled the front, 134 with panels; photos without panels are negatives). To score it on dev without testing on training photos, dev is split in 5 folds by an MD5 hash of the barcode: fold *k*'s model trains on the other four and predicts fold *k*, so every dev photo is scored by a model that didn't see it (`--cv-tag` in the evaluation). No model selection on held-out photos: each model trains a fixed 100 epochs (YOLO26n from COCO weights, `imgsz=1024`, batch 16, seed 0, no horizontal flips since mirrored text doesn't occur, ±10° rotation) and keeps the last weights. The final model trains the same way on all of dev and is the one scored on val. A model takes ~10 min on one H100 of the UFSC server; the ONNX file is 9.6 MB. The weights aren't in git yet (the trained model is on the server, `~/privado/visao-computacional/data/detector/yolo26n_1024/all.onnx`): retrain with the command above, or copy that file to `models/front_detector.onnx`. Training isn't bit-exact (images cached in RAM), so a retrained model can differ by a photo or two.
+
+### Final score: validation set (held out, hand-labeled)
+
+391 val photos labeled by hand (386 the front, 5 with an unreadable warning; 127 show a warning). Everything was decided on dev; val was run once per method, at the end:
+
+| | OCR | YOLO + OCR |
+| :--- | ---: | ---: |
+| **All three warnings right** | **93.3%** | **97.7%** |
+| Photos with a warning: all three right | 81.9% | 94.5% |
+| Added sugars: precision / recall / F1 | 92.7 / 92.7 / 92.7% | 98.7 / 95.1 / 96.9% |
+| Saturated fat: precision / recall / F1 | 93.7 / 84.3 / 88.7% | 98.6 / 97.1 / 97.8% |
+| Sodium: precision / recall / F1 | 93.8 / 78.9 / 85.7% | 100.0 / 89.5 / 94.4% |
+| Any warning: precision / recall | 97.3 / 86.6% | 98.4 / 94.5% |
+| Time per photo, median (mean) | 5.05 s (5.27 s) | 0.39 s (1.38 s) |
+| Detector: AP@0.5 / box recall / box precision | | 94.2 / 93.4 / 92.7% |
+
+Times: one process, ONNX Runtime on one thread, CPU, on the shared server (load far above its cores, so absolute numbers are pessimistic; the two methods ran one after the other). YOLO + OCR is faster because RapidOCR reads only the small crops: photos without a panel cost only the detection (~0.35 s), a photo with a panel ~3 s.
+
+The OCR method loses 3.2 points from dev to val (96.5% → 93.3%), YOLO + OCR none (97.6% → 97.7%): the OCR rules were fitted to dev's errors. On val, 14 of the OCR's 26 errors are panels where "ALTO EM" isn't read, 3 miss a nutrient next to a read anchor, and 9 add a nutrient (3 of them on photos labeled without a warning). YOLO + OCR's 9 val errors: 3 panels not detected, 4 detected but misread (a 43 × 38 px panel, a thin 311 × 36 one, a vertical one), and 2 nutrients found on panels labeled without a warning (partly visible panels).
+
+### Results on dev (cross-validation)
+
+490 dev photos labeled the front, 4 unreadable; 130 show a warning. YOLO + OCR on dev is the out-of-fold prediction (each photo scored by the model that didn't train on it).
+
+| | OCR | YOLO + OCR |
+| :--- | ---: | ---: |
+| **All three warnings right** | **96.5%** | **97.6%** |
+| Photos with a warning: all three right | 88.5% | 92.3% |
+| Added sugars: precision / recall / F1 | 97.4 / 90.4 / 93.8% | 100.0 / 94.0 / 96.9% |
+| Saturated fat: precision / recall / F1 | 97.0 / 94.1 / 95.5% | 96.9 / 92.6 / 94.7% |
+| Sodium: precision / recall / F1 | 95.7 / 95.7 / 95.7% | 100.0 / 87.0 / 93.0% |
+| Any warning: precision / recall | 98.3 / 91.5% | 98.4 / 93.8% |
+| Time per photo, median (mean) | 6.41 s (6.85 s) | 0.44 s (1.33 s) |
+
+Detector, out of fold (494 photos, 134 labeled boxes; ultralytics' mAP@0.5 per held-out fold: 0.96 / 0.98 / 0.99 / 0.99 / 0.96):
+
+| Score ≥ | AP@0.5 | Box recall | Box precision | Photos with a panel: found | Photos without: a box |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.05 | 95.3% | 95.5% | 85.9% | 96.3% | 3.3% |
+| **0.1** (used) | 95.3% | 94.8% | 92.0% | 95.5% | 1.4% |
+| 0.25 | 95.3% | 94.0% | 96.2% | 94.8% | 0.8% |
+| 0.5 | 95.3% | 93.3% | 99.2% | 93.3% | 0.3% |
+
+**OCR rules**, each added to the previous one (dev):
+
+| Rule | All three | Δ | Any warning P / R |
+| :--- | ---: | ---: | :--- |
+| Baseline: anchor + panel, distinctive word per nutrient, reach 10 heights, height ratio 0.6–1.6 | 95.7% | | 98.3 / 91.5% |
+| + any word of the phrase (*gordura* read without *saturada*) | 95.7% | 0 | 97.5 / 91.5% |
+| + reach 14 heights, height ratio 0.5–2.0 (horizontal panels, perspective) | 96.3% | +0.6 | 97.5 / 91.5% |
+| + Spanish panels (by their words) don't count | **96.5%** | +0.2 | 98.3 / 91.5% |
+
+**YOLO + OCR settings** (dev, all three right; the chosen settings give 97.6%):
+
+| Setting | All three | Note |
+| :--- | ---: | :--- |
+| Box score ≥ 0.05 / **0.1** / 0.25 / 0.5 | 97.8 / **97.6** / 97.6 / 97.6% | 0.05: +1 photo for 14% false boxes (an OCR call each) |
+| Match similarity in crops 0.8 / **0.7** / 0.6 | 97.3 / **97.6** / 82.2% | 0.7 reads *CATURA*, *ADICUCNADO*; 0.6 matches almost anything |
+| Crop margin 0.05 / **0.15** / 0.3 | 97.6 / **97.6** / 97.8% | within noise (1 photo) |
+| Crop short side: no upscale / **480** / 960 px | 97.3 / **97.6** / 97.1% | within noise |
+| Detector at `imgsz` 640 instead of **1024** | 97.6% | AP@0.5 94.8 vs 95.3%, more false boxes (4.4% vs 1.4% of photos without a panel); detection 0.14 s vs 0.39 s |
+
+Tried and dropped:
+
+| Technique | Result (dev, all three right) | Why |
+| :--- | :--- | :--- |
+| Reject "ALTO EN" as an anchor (Spanish warning) | 96.3% → 96.1% | the OCR reads the real "ALTO EM" as *ALTOEN* (2 warnings lost, 1 Spanish one avoided); replaced by Spanish words in the panel |
+| Nutrient words anywhere on a photo with an anchor | 90.6% | ingredients and claims: sodium precision 56% |
+| YOLO crops: count only crops where "ALTO EM" is read | 97.6% → 96.1% | the anchor is misread more often than the nutrients |
+| YOLO + OCR **or** whole-photo OCR (union) | 97.8% (+0.2) on dev, 96.4% on val (−1.3) | costs both methods and adds the OCR's false positives (val was only scored, not used to drop it) |
+
+**Where errors remain** (YOLO + OCR, dev, 12 photos): 5 panels not detected (2 of them vertical, one 64 × 17 px), 5 detected but misread by the OCR (*PALTOEM* alone, *ANMSUAR*, *SÓO1O*), and 2 false positives (one on a partly visible panel the hand label marks without a warning).
+
+---
+
+## ✅ Whole system: photos → verdict (the app)
+
+The app (`web/`, see its README) runs the back pipeline, the rules and the front pipeline (YOLO + OCR) on a pair of photos and gives a verdict: compliant, inconclusive or non-compliant. `pixi run eval-e2e --split dev` compares that verdict with the one the hand labels of both sides give (same rules, same `summarize()`), on every product with both sides labeled.
+
+Dev, 494 products (2026-11-12, server, 32 workers; history of the changes below):
+
+| Labels \ App | compliant | inconclusive | non-compliant |
+| :--- | ---: | ---: | ---: |
+| **compliant** (309) | **244** | 58 | 7 |
+| **inconclusive** (126) | 53 | **66** | 7 |
+| **non-compliant** (59) | 3 | 9 | **47** |
+
+- Same verdict as the labels: **72.3%**; when the app decides (not inconclusive, 361 products): **80.6%**.
+- Violations: 47 of 59 caught (79.7%), only 3 called compliant.
+- False accusations: 7 of 309 compliant products (2.3%) called non-compliant; of the app's 61 "non-compliant" answers, 47 are right (77%).
+- Truly inconclusive products (old-format tables, values nobody could read) called compliant: 51 of 126, the old-format detection weakness of the back pipeline.
+
+**The false accusations come from the back.** Of the first run's 21, 20 were back misreadings (the front warnings were read right) and 1 a missed front warning. Their causes: values from the wrong column or row (%VD or per portion, ~9), physically impossible values (477 g of saturated fat per 100 g, 411,415 mg of sodium, ~6), thousands read as decimals ("1.180 mg" as 1.18, 2), values not read (~3). Two parser fixes, measured on dev:
+
+| Change | Back: all three right | E2E: same verdict | False accusations | Violations caught |
+| :--- | ---: | ---: | ---: | ---: |
+| Before | 77.4% | 72.1% | 21 | 48 / 59 |
+| + "1.180" read as 1180 (dot + three digits = thousands); amounts above 100 g or 40,000 mg of sodium per 100 g/ml dropped (another row, or unknown) | 77.6% | **72.5%** | **18** | 47 / 59 |
+| + photos on their side or upside down turned (Tesseract OSD on the whole photo, OSD's angle applied directly) | 79.5% | 73.3% | 12 | 47 / 59 |
+| + a turn kept only if the photo reads better turned (OSD, or 90/270 when most text lines are taller than wide) | **79.6%** | **73.7%** | 13 | 47 / 59 |
+| + no values from beyond the label's row (nearby rows, nearest number, row re-read): unknown instead (inconclusive) | 77.7% | 72.3% | **7** | 47 / 59 |
+
+Of the 20 readings it changed on dev, 5 are thousands fixed and 15 impossible values dropped; 3 false accusations went (2 now right, 1 inconclusive), none appeared. Fewer than the ~8 expected: %VD values such as 100, 90 or 60 are physically possible and pass the limit, and some dropped values were replaced by another wrong row. The violation lost had been "caught" by an impossible reading (359 g of sugar). A closer look at the 17 that came from the back: 7 were tables photographed on their side (the parser took the nutrients as a row and the numbers of another row), ~5 were values Tesseract filled in where RapidOCR read none ("3,2" as "32;"), 1–2 a sentence "não contém quantidades significativas" read as a table row, and only a few the per-portion or %VD column. Turning rotated photos (vision/back/orient.py) fixed 6 of the 7. Applied directly, OSD also turned 2 upright photos upside down (180 degrees, confidence up to 4.6); with every turn checked by the reading, 15 dev products read better and none worse. The sentence now wins over a number read on or below its first line (its own text), while a table row above it still wins as before.
+
+**Where the values come from.** Recorded per value (`<nutrient>_source` in the back CSV), on readable dev photos: the label's own row is right 90–95% of the time (RapidOCR and Tesseract alike: Tesseract's 224 values gave 214 right decisions and 10 wrong, so its fallback stays), the "não contém" sentence 97–100%, but the rules beyond the row only 12–36%: the `100 g` column on nearby rows, the nearest number, and the row-by-row re-read. Those caused 6 of the 13 remaining false accusations, and their "right" decisions were mostly a wrong value on the right side of the limit. Turned off (`parse.NEARBY_ROWS`, `pipeline.REFINE`), measured end to end: false accusations 13 → 7, violations caught unchanged (and one fewer called compliant), 13 more compliant products answered inconclusive, and the reading ~25% faster. The back's "all three right" drops (79.6 → 77.7%) because it counts an unknown value as wrong; the verdict, which says "inconclusive" for it, is what the app shows.
+
+**Val** (held out, once, 2026-11-12), 391 products with both sides labeled:
+
+| Labels \ App | compliant | inconclusive | non-compliant |
+| :--- | ---: | ---: | ---: |
+| **compliant** (271) | **188** | 67 | 16 |
+| **inconclusive** (89) | 7 | **74** | 8 |
+| **non-compliant** (31) | 3 | 8 | **20** |
+
+- Same verdict as the labels: **72.1%**; when the app decides (242 products): **86.0%** right.
+- Violations: 20 of 31 caught (64.5%), 3 called compliant.
+- False accusations: 16 of 271 compliant products (5.9%), more than on dev (2.3%); of the app's 44 "non-compliant" answers, 20 are right (45%). The changes that cut them on dev were chosen from dev's errors, and val's photos have other ones: they are the next thing to look at, on dev.
+- More compliant products come out inconclusive than on dev (25% vs 19%), and far fewer truly inconclusive ones (old-format tables) come out compliant (7 of 89 vs 53 of 126 on dev).
 
 ## 📊 Dataset Details
 
