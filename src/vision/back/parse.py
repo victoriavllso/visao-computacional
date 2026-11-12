@@ -78,6 +78,14 @@ MAX_PER_100 = {
 }
 
 
+# Rules beyond the label's own row: the '100 g' column on nearby rows and the
+# nearest number anywhere. On dev their values were right 12-36% of the time
+# (vs 90-95% for the label's own row) and gave 6 of the 13 products wrongly
+# called non-compliant. Off: an unread value is unknown (inconclusive) rather
+# than a guess; false accusations 13 -> 7, violations caught unchanged.
+NEARBY_ROWS = False
+
+
 def plausible(nutrient, value):
     return 0 <= value <= MAX_PER_100[nutrient]
 
@@ -322,9 +330,9 @@ def parse_table(words) -> Reading:
             value, rule = value_in_column(row[index + 1 :], label, headers), "column"
             if value is None:
                 value, rule = value_after(row, index), "first_right"
-            if value is None:
+            if value is None and NEARBY_ROWS:
                 value, rule = value_in_column(words, label, headers), "column_rows"
-            if value is None:
+            if value is None and NEARBY_ROWS:
                 value, rule = value_near(words, label), "near"
             # An impossible amount is a misreading: try the other rows.
             if value is not None and plausible(nutrient, value):

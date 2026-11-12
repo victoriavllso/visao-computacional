@@ -29,8 +29,11 @@ from vision.back.parse import (
 )
 
 # Re-read the value region of each found label as a single text line:
-# "fill" only missing values, "override" every value, None to skip.
-REFINE = "fill"
+# "fill" only missing values, "override" every value, None to skip. It helped
+# Tesseract alone (+3 pts, README); next to RapidOCR its values were right
+# 14% of the time on dev (14 values), so off, like the parser's nearby-row
+# rules (parse.NEARBY_ROWS).
+REFINE = None
 # "tesseract": classical preprocessing + Tesseract; "rapidocr": learned OCR
 # on the located and straightened color crop; "combined": RapidOCR's value
 # for each nutrient, Tesseract's where RapidOCR has none. RapidOCR is more

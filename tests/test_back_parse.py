@@ -171,14 +171,20 @@ def test_unit_misread_as_digit_is_not_the_value():
     assert parse_table(words).facts.added_sugars_g == 8.7
 
 
-def test_value_drifted_out_of_the_row_is_still_found():
-    # Curved package: the number sits lower than its label.
+def test_value_drifted_out_of_the_row_is_unknown(monkeypatch):
+    # Curved package: the number sits lower than its label. Nearby rows are
+    # off (parse.NEARBY_ROWS: right 12-36% of the time on dev), so the value
+    # is unknown; with them on, the nearest number is taken.
+    from vision.back import parse
+
     words = [
         Word("Sódio", 0, 100, 50, 20),
         Word("(mg)", 60, 100, 40, 20),
         Word("367", 300, 116, 30, 20),
     ]
 
+    assert parse_table(words).facts.sodium_mg is None
+    monkeypatch.setattr(parse, "NEARBY_ROWS", True)
     assert parse_table(words).facts.sodium_mg == 367
 
 
