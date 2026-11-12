@@ -6,10 +6,13 @@ the 17 products the back made the app wrongly call non-compliant). Two
 classical cues, cheapest first:
 
     Tesseract OSD   orientation of the whole photo (0/90/180/270), with a
-                    confidence; it misses small tables in large photos
+                    confidence; it misses small tables in large photos, and
+                    sometimes asks for 180 on upright ones
     text lines      most lines read by the learned OCR are taller than wide:
-                    the text runs vertically, the table is on its side; the
-                    direction (90 or 270) is the one the parser reads best
+                    the text runs vertically, the table is on its side
+
+Either cue only proposes turns: the pipeline reads the photo turned and
+keeps the turn only if the parser reads it better (vision/back/pipeline.py).
 """
 
 import cv2

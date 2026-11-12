@@ -84,14 +84,24 @@ def read_back(
         if image is None:
             raise FileNotFoundError(path)
 
-    rotation = osd_rotation(image) if orient else 0
-    result = _read(rotate(image, rotation), locate, preprocess, debug_dir)
-    if orient and not rotation and vertical_text(result.lines):
+    result, rotation = _read(image, locate, preprocess, debug_dir), 0
+    if not orient:
+        return result
+    # OSD only suggests a turn: it also asked for 180 degrees on upright
+    # photos the parser read right (dev, confidence up to 4.6). Each turn is
+    # kept only if the photo reads better turned; ties keep the photo as is.
+    suggested = osd_rotation(image)
+    if suggested:
+        candidates = [suggested]
+    elif vertical_text(result.lines):
         # On its side and OSD wasn't sure which way: the reading tells.
-        for degrees in (90, 270):
-            candidate = _read(rotate(image, degrees), locate, preprocess, None)
-            if reading_score(candidate) > reading_score(result):
-                result, rotation = candidate, degrees
+        candidates = [90, 270]
+    else:
+        candidates = []
+    for degrees in candidates:
+        candidate = _read(rotate(image, degrees), locate, preprocess, None)
+        if reading_score(candidate) > reading_score(result):
+            result, rotation = candidate, degrees
     return replace(result, rotation=rotation)
 
 
