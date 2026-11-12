@@ -451,8 +451,10 @@ Dev, 494 products (2026-11-11, server, 32 workers):
 | :--- | ---: | ---: | ---: | ---: |
 | Before | 77.4% | 72.1% | 21 | 48 / 59 |
 | + "1.180" read as 1180 (dot + three digits = thousands); amounts above 100 g or 40,000 mg of sodium per 100 g/ml dropped (another row, or unknown) | 77.6% | **72.5%** | **18** | 47 / 59 |
+| + photos on their side or upside down turned (Tesseract OSD on the whole photo, OSD's angle applied directly) | 79.5% | 73.3% | 12 | 47 / 59 |
+| + a turn kept only if the photo reads better turned (OSD, or 90/270 when most text lines are taller than wide) | **79.6%** | **73.7%** | 13 | 47 / 59 |
 
-Of the 20 readings it changed on dev, 5 are thousands fixed and 15 impossible values dropped; 3 false accusations went (2 now right, 1 inconclusive), none appeared. Fewer than the ~8 expected: %VD values such as 100, 90 or 60 are physically possible and pass the limit, and some dropped values were replaced by another wrong row. The violation lost had been "caught" by an impossible reading (359 g of sugar). The remaining false accusations are mostly the wrong column: the next thing to fix.
+Of the 20 readings it changed on dev, 5 are thousands fixed and 15 impossible values dropped; 3 false accusations went (2 now right, 1 inconclusive), none appeared. Fewer than the ~8 expected: %VD values such as 100, 90 or 60 are physically possible and pass the limit, and some dropped values were replaced by another wrong row. The violation lost had been "caught" by an impossible reading (359 g of sugar). A closer look at the 17 that came from the back: 7 were tables photographed on their side (the parser took the nutrients as a row and the numbers of another row), ~5 were values Tesseract filled in where RapidOCR read none ("3,2" as "32;"), 1–2 a sentence "não contém quantidades significativas" read as a table row, and only a few the per-portion or %VD column. Turning rotated photos (vision/back/orient.py) fixed 6 of the 7. Applied directly, OSD also turned 2 upright photos upside down (180 degrees, confidence up to 4.6); with every turn checked by the reading, 15 dev products read better and none worse. The sentence now wins over a number read on or below its first line (its own text), while a table row above it still wins as before.
 
 Val is kept for the final check.
 
