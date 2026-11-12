@@ -432,17 +432,17 @@ Tried and dropped:
 
 The app (`web/`, see its README) runs the back pipeline, the rules and the front pipeline (YOLO + OCR) on a pair of photos and gives a verdict: compliant, inconclusive or non-compliant. `pixi run eval-e2e --split dev` compares that verdict with the one the hand labels of both sides give (same rules, same `summarize()`), on every product with both sides labeled.
 
-Dev, 494 products (2026-11-11, server, 32 workers):
+Dev, 494 products (2026-11-12, server, 32 workers; history of the changes below):
 
 | Labels \ App | compliant | inconclusive | non-compliant |
 | :--- | ---: | ---: | ---: |
-| **compliant** (309) | **243** | 48 | 18 |
-| **inconclusive** (126) | 51 | **68** | 7 |
-| **non-compliant** (59) | 4 | 8 | **47** |
+| **compliant** (309) | **244** | 58 | 7 |
+| **inconclusive** (126) | 53 | **66** | 7 |
+| **non-compliant** (59) | 3 | 9 | **47** |
 
-- Same verdict as the labels: **72.5%**; when the app decides (not inconclusive, 370 products): 78.4%.
-- Violations: 47 of 59 caught (79.7%), only 4 called compliant.
-- False accusations: 18 of 309 compliant products (5.8%) called non-compliant; of the app's 72 "non-compliant" answers, 47 are right (65%).
+- Same verdict as the labels: **72.3%**; when the app decides (not inconclusive, 361 products): **80.6%**.
+- Violations: 47 of 59 caught (79.7%), only 3 called compliant.
+- False accusations: 7 of 309 compliant products (2.3%) called non-compliant; of the app's 61 "non-compliant" answers, 47 are right (77%).
 - Truly inconclusive products (old-format tables, values nobody could read) called compliant: 51 of 126, the old-format detection weakness of the back pipeline.
 
 **The false accusations come from the back.** Of the first run's 21, 20 were back misreadings (the front warnings were read right) and 1 a missed front warning. Their causes: values from the wrong column or row (%VD or per portion, ~9), physically impossible values (477 g of saturated fat per 100 g, 411,415 mg of sodium, ~6), thousands read as decimals ("1.180 mg" as 1.18, 2), values not read (~3). Two parser fixes, measured on dev:
@@ -453,8 +453,11 @@ Dev, 494 products (2026-11-11, server, 32 workers):
 | + "1.180" read as 1180 (dot + three digits = thousands); amounts above 100 g or 40,000 mg of sodium per 100 g/ml dropped (another row, or unknown) | 77.6% | **72.5%** | **18** | 47 / 59 |
 | + photos on their side or upside down turned (Tesseract OSD on the whole photo, OSD's angle applied directly) | 79.5% | 73.3% | 12 | 47 / 59 |
 | + a turn kept only if the photo reads better turned (OSD, or 90/270 when most text lines are taller than wide) | **79.6%** | **73.7%** | 13 | 47 / 59 |
+| + no values from beyond the label's row (nearby rows, nearest number, row re-read): unknown instead (inconclusive) | 77.7% | 72.3% | **7** | 47 / 59 |
 
 Of the 20 readings it changed on dev, 5 are thousands fixed and 15 impossible values dropped; 3 false accusations went (2 now right, 1 inconclusive), none appeared. Fewer than the ~8 expected: %VD values such as 100, 90 or 60 are physically possible and pass the limit, and some dropped values were replaced by another wrong row. The violation lost had been "caught" by an impossible reading (359 g of sugar). A closer look at the 17 that came from the back: 7 were tables photographed on their side (the parser took the nutrients as a row and the numbers of another row), ~5 were values Tesseract filled in where RapidOCR read none ("3,2" as "32;"), 1–2 a sentence "não contém quantidades significativas" read as a table row, and only a few the per-portion or %VD column. Turning rotated photos (vision/back/orient.py) fixed 6 of the 7. Applied directly, OSD also turned 2 upright photos upside down (180 degrees, confidence up to 4.6); with every turn checked by the reading, 15 dev products read better and none worse. The sentence now wins over a number read on or below its first line (its own text), while a table row above it still wins as before.
+
+**Where the values come from.** Recorded per value (`<nutrient>_source` in the back CSV), on readable dev photos: the label's own row is right 90–95% of the time (RapidOCR and Tesseract alike: Tesseract's 224 values gave 214 right decisions and 10 wrong, so its fallback stays), the "não contém" sentence 97–100%, but the rules beyond the row only 12–36%: the `100 g` column on nearby rows, the nearest number, and the row-by-row re-read. Those caused 6 of the 13 remaining false accusations, and their "right" decisions were mostly a wrong value on the right side of the limit. Turned off (`parse.NEARBY_ROWS`, `pipeline.REFINE`), measured end to end: false accusations 13 → 7, violations caught unchanged (and one fewer called compliant), 13 more compliant products answered inconclusive, and the reading ~25% faster. The back's "all three right" drops (79.6 → 77.7%) because it counts an unknown value as wrong; the verdict, which says "inconclusive" for it, is what the app shows.
 
 Val is kept for the final check.
 
