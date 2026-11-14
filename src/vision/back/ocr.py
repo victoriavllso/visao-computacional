@@ -140,16 +140,20 @@ def read_row(clean, x0, y0, x1, y1, lang="por") -> list[Word]:
     ]
 
 
-_rapidocr = None
+# One RapidOCR engine per model size, created on first use.
+_rapidocr = {}
+_threads_limited = False
 
 
 def _limit_onnx_threads():
     """RapidOCR doesn't expose ONNX Runtime's thread count, and by default
     each process uses every core. ORT_THREADS (e.g. 1 per worker when
     evaluating in parallel) is applied to the sessions it creates."""
+    global _threads_limited
     threads = int(os.environ.get("ORT_THREADS", 0))
-    if not threads:
+    if not threads or _threads_limited:
         return
+    _threads_limited = True
 
     import onnxruntime
 
@@ -164,41 +168,67 @@ def _limit_onnx_threads():
     onnxruntime.SessionOptions = session_options
 
 
-def read_words_rapidocr(image) -> list[Word]:
-    """Learned OCR (PaddleOCR models through RapidOCR / ONNX Runtime), on the
-    color crop: it is trained on photos, binarizing first makes it worse.
-    Returns one Word per detected text line, e.g. 'Gorduras saturadas (g)'."""
-    global _rapidocr
-    if _rapidocr is None:
+def _engine(model):
+    """PP-OCRv6 detection and recognition models: "small" (RapidOCR's
+    default) or "medium" (~4.7x slower per call on one thread, 12 dev
+    crops)."""
+    if model not in _rapidocr:
         _limit_onnx_threads()
         import logging
 
-        from rapidocr import RapidOCR
+        from rapidocr import ModelType, RapidOCR
 
-        _rapidocr = RapidOCR()
+        if model == "small":
+            engine = RapidOCR()
+        elif model == "medium":
+            engine = RapidOCR(
+                params={
+                    "Det.model_type": ModelType.MEDIUM,
+                    "Rec.model_type": ModelType.MEDIUM,
+                }
+            )
+        else:
+            raise ValueError(f"unknown RapidOCR model: {model}")
+        _rapidocr[model] = engine
 
         # Set RapidOCR's logger to ERROR level to avoid excessive logging output
-        ocr_logger = logging.getLogger("RapidOCR")
-        ocr_logger.setLevel(logging.ERROR)
+        logging.getLogger("RapidOCR").setLevel(logging.ERROR)
+    return _rapidocr[model]
 
+
+def rapidocr_lines(image, model="small") -> list:
+    """RapidOCR's raw output as plain lists, [[box, text, score], ...], box
+    being the four corners [[x, y], ...] of the text line (it may be
+    tilted). Plain data, so it can be cached (vision/back/cache.py)."""
     if image.ndim == 2:
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-    output = _rapidocr(image)
+    output = _engine(model)(image)
     # No text found: boxes is None.
-    result = (
-        zip(output.boxes, output.txts, output.scores)
-        if output.boxes is not None
-        else []
-    )
+    if output.boxes is None:
+        return []
+    return [
+        [[[float(x), float(y)] for x, y in box], text, float(score)]
+        for box, text, score in zip(output.boxes, output.txts, output.scores)
+    ]
 
+
+def words_from_lines(lines) -> list[Word]:
+    """One Word per RapidOCR text line, on the line's upright bounding box."""
     words = []
-    for box, text, score in result or []:
+    for box, text, score in lines:
         xs, ys = [p[0] for p in box], [p[1] for p in box]
         x, y = int(min(xs)), int(min(ys))
         words.append(
             Word(text, x, y, int(max(xs)) - x, int(max(ys)) - y, 100 * float(score))
         )
     return words
+
+
+def read_words_rapidocr(image, model="small") -> list[Word]:
+    """Learned OCR (PaddleOCR models through RapidOCR / ONNX Runtime), on the
+    color crop: it is trained on photos, binarizing first makes it worse.
+    Returns one Word per detected text line, e.g. 'Gorduras saturadas (g)'."""
+    return words_from_lines(rapidocr_lines(image, model))
 
 
 def read_words(image, preprocess=True, lang="por") -> list[Word]:

@@ -213,8 +213,18 @@ photo ─► locate ─► almost no text? ────────────�
 **Evaluation** against the ground truth (hand labels where they exist, see [LABELING.md](LABELING.md); Open Food Facts values otherwise):
 
 ```bash
-pixi run eval --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug]
+pixi run eval --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug] [--ocr-cache] [--rapidocr-model small|medium]
 ```
+
+`--ocr-cache` stores every OCR result (Tesseract words, RapidOCR lines with their four-corner boxes, Tesseract OSD) in `data/cache/back_ocr/<code>.json` and reuses it on later runs (`vision/back/cache.py`). A change to the rules after the OCR (parse, classify, combine, orientation choice) is then scored on the same reading without running the OCR again: on 50 dev products, 3 s instead of 113 s, with identical results. Bump `cache.VERSION` after changing anything before the OCR (locate, dewarp, preprocessing). Building the cache on the server and copying it here lets rule changes be measured on the whole dev set locally:
+
+```bash
+pixi run eval --split dev --hand-only --workers 32 --ocr-cache   # on the server
+tar czf back_ocr_cache.tar.gz -C data/cache back_ocr             # bring this file back
+tar xzf back_ocr_cache.tar.gz -C data/cache                      # locally
+```
+
+`--rapidocr-model medium` uses PP-OCRv6's medium detection and recognition models instead of the small ones (about 4.7× slower per RapidOCR call); its cache entries are kept apart from the small model's.
 
 Results are saved to `data/evaluation/back_<split>_<timestamp>_<tag>/` (CSV + Markdown report). Symlinks in `data/evaluation/latest/` (`back_dev.csv`, `back_val.csv` and `.md` reports) always point to the most recent run for each split. Other tools (labeling server, confusion matrix) read from `latest/` by default; pass an explicit path to use a specific run.
 
