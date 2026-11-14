@@ -125,7 +125,9 @@ def read_row(clean, x0, y0, x1, y1, lang="por") -> list[Word]:
             output_type=pytesseract.Output.DICT,
             timeout=TIMEOUT_SECONDS,
         )
-    except RuntimeError:
+    except pytesseract.TesseractError:
+        raise  # see read_words
+    except RuntimeError:  # pytesseract's timeout
         return []
 
     return [
@@ -288,6 +290,11 @@ def read_words(image, preprocess=True, lang="por") -> list[Word]:
             output_type=pytesseract.Output.DICT,
             timeout=TIMEOUT_SECONDS,
         )
+    except pytesseract.TesseractError:
+        # Also a RuntimeError, but a broken install (e.g. no Portuguese data
+        # where pytesseract finds tesseract), not a hard image: it would
+        # silently read nothing on every photo.
+        raise
     except RuntimeError:  # pytesseract's timeout
         return []
 
