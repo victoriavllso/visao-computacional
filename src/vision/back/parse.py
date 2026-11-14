@@ -52,10 +52,23 @@ class Reading:
 # 'Gord. sat.'), and words that look similar but belong to other rows.
 LABELS = {
     Nutrient.ADDED_SUGARS: (("adicionados", "adic"), ()),
-    Nutrient.SATURATED_FAT: (("saturadas",), ("insaturadas", "monoinsaturadas")),
-    Nutrient.SODIUM: (("sodio",), ()),
+    # 'Saturated': English tables printed next to the Brazilian one are per
+    # serving (dev: 'Saturated fat' matched at 0.78, its row's number taken).
+    Nutrient.SATURATED_FAT: (
+        ("saturadas",),
+        ("insaturadas", "monoinsaturadas", "saturated"),
+    ),
+    # 'Sodium': imported products with an English table next to the Portuguese.
+    Nutrient.SODIUM: (("sodio", "sodium"), ()),
 }
 MIN_SIMILARITY = 0.75
+# A unit in parentheses at the end of a label word: 'Sódio(mg)', '(g)' read
+# as '(9)'. Only these are cut: RapidOCR reads the accent of 'Só' as a
+# parenthesis ('S(odio', '(odi (mg)'), and cutting from any '(' left 's'
+# (dev: 17 sodium rows lost, their values on the same row).
+UNIT_SUFFIX = re.compile(
+    r"\(\s*(?:m?g|ml|mi|kcal|kj|ng|mq|µg|mcg|9|6|o|a)?\s*\)?\s*$", re.IGNORECASE
+)
 
 # Letters OCR confuses with digits inside numbers.
 DIGIT_FIXES = str.maketrans({"O": "0", "o": "0", "l": "1", "I": "1"})
@@ -115,6 +128,46 @@ def parse_number(text):
     return float(number.replace(",", "."))
 
 
+# Tokens of an OCR text line: a parenthesized group, a run of letters, a
+# number with what is glued after it, or other punctuation. Linear text is
+# often read without spaces: 'saturadas4,4g(0,5g,3%)·Sódio 99mg' →
+# 'saturadas', '4,4g', '(0,5g,3%)', 'Sódio', '99mg'.
+TOKEN = re.compile(
+    r"\([^\s()\[\]·•]*\)?"  # '(0,5g,3%)', '(mg)', '(odio' (accent read as '(')
+    r"|\[[^\s()\[\]·•]*\]?"
+    r"|\d[\d.,]*(?:mg|ml|kcal|kj|g|%)?"  # a number and its unit, not the next word
+    r"|[^\W\d_]+"  # letters
+    r"|[^\s\w(\[·•]+",  # other punctuation
+    re.IGNORECASE,
+)
+
+
+def split_word(word):
+    """The tokens of a word holding a whole text line, as Words.
+
+    RapidOCR returns a text line as one box. In linear text the label and its
+    value are then one word ('Sódio 155 mg (74 mg, 4%)'), so the value, which
+    the parser looks for in the words after the label, was never read (dev:
+    ~45 values); and neighboring cells merge ('120 6', value and %VD, parsed
+    as 1206). Each token gets the share of the box width of its characters
+    (RapidOCR gives no per-character positions). Words without spaces (all of
+    Tesseract's) are kept as they are."""
+    if not re.search(r"\s", word.text.strip()):
+        return [word]
+    per_char = word.w / max(len(word.text), 1)
+    return [
+        Word(
+            token.group(),
+            int(word.x + token.start() * per_char),
+            word.y,
+            max(1, int(len(token.group()) * per_char)),
+            word.h,
+            word.conf,
+        )
+        for token in TOKEN.finditer(word.text)
+    ]
+
+
 def group_rows(words):
     """Group words whose vertical centers are within half a word height."""
     rows = []
@@ -138,7 +191,7 @@ def find_label(row, nutrient):
 
     for i, word in enumerate(row):
         # Drop a unit glued to the label, e.g. 'Sódio(mg)'.
-        token = normalize(re.sub(r"\(.*$", "", word.text))
+        token = normalize(UNIT_SUFFIX.sub("", word.text))
         if len(token) < 3:
             continue
         # Learned OCR returns whole phrases without spaces:
@@ -147,7 +200,11 @@ def find_label(row, nutrient):
             continue
         if any(len(key) >= 5 and key in token for key in keys):
             return i
-        score = max(similarity(token, key) for key in keys)
+        # Abbreviations ('adic') only as a prefix: fuzzy, they match short
+        # ingredient words ('dico', dev: total sugars read as added).
+        if any(len(key) < 5 and token.startswith(key) for key in keys):
+            return i
+        score = max(similarity(token, key) for key in keys if len(key) >= 5)
         if any(similarity(token, e) > score for e in excluded):
             continue
         if score >= MIN_SIMILARITY:
@@ -309,7 +366,14 @@ def not_significant(rows):
 
 
 def parse_table(words) -> Reading:
-    rows = group_rows(words)
+    # Rows are grouped on whole OCR boxes, then each box is split in place:
+    # splitting first interleaves the tokens of two boxes grouped into one
+    # row ('Fibras alimentares (g)' over 'Sódio (mg)' read as 'Fibras Sódio
+    # alimentares (mg) (g)', dev: 1110 mg of sodium read as 0).
+    rows = [
+        [token for word in row for token in split_word(word)]
+        for row in group_rows(words)
+    ]
     headers = find_headers(rows)
     values, matches, labels, spans, value_rows, sources = {}, {}, set(), {}, {}, {}
     # The sentence mentions the labels; it isn't a table row.

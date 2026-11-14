@@ -56,6 +56,13 @@ UNCERTAIN_AS = PhotoType.OLD_FORMAT
 # Turn photos taken on their side or upside down before reading them
 # (vision/back/orient.py).
 ORIENT = True
+# When the located table leaves a value unread, or looks empty, RapidOCR
+# reads the whole photo and fills only the missing values. The locator's box
+# is the ruled lines plus one text height: tables whose lines are faint or
+# broken under the label column lose the labels ('Sódio' is short and at the
+# far left), and bent bottom rows fall outside. Tesseract keeps the crop (it
+# needs the scaling and binarization); RapidOCR reads whole photos well.
+FULL_PHOTO_FALLBACK = True
 
 
 @dataclass
@@ -183,6 +190,22 @@ def _read(image, locate, preprocess, debug_dir) -> BackResult:
 
             save_ocr_rapidocr(debug_dir, crop, learned)
 
+    # Stage 4: the table's box lost what was missing; the whole photo may
+    # have it. Only when a box was cut (otherwise RapidOCR already read the
+    # whole photo) and the crop left something to find.
+    if (
+        ENGINE == "combined"
+        and FULL_PHOTO_FALLBACK
+        and table is not None
+        and table.box is not None
+        and needs_full_photo(photo_type, reading)
+    ):
+        full = read_words_rapidocr(image)
+        reading = combine(reading, parse_table(full), names=(None, "rapidocr_full"))
+        if not photo_type.readable:
+            photo_features = features(table, words + learned + full, reading)
+            photo_type = classify(photo_features)
+
     if photo_type is PhotoType.UNCERTAIN:
         # Still no format evidence with all the text read.
         photo_type = UNCERTAIN_AS
@@ -198,13 +221,26 @@ def _read(image, locate, preprocess, debug_dir) -> BackResult:
     return result
 
 
+def needs_full_photo(photo_type, reading):
+    """The crop looked empty or format-less, or a readable table has a
+    value left unread."""
+    if photo_type in (PhotoType.NO_TABLE, PhotoType.UNCERTAIN):
+        return True
+    return photo_type.readable and any(
+        reading.facts.amount(nutrient) is None for nutrient in Nutrient
+    )
+
+
 def combine(primary, fallback, names=("rapidocr", "tesseract")):
-    """Each value from `primary`, from `fallback` where `primary` has none."""
+    """Each value from `primary`, from `fallback` where `primary` has none.
+    A name of None keeps that reading's sources as they are (already
+    prefixed by an earlier combine)."""
     sources = {}
     for nutrient in Nutrient:
         for name, reading in zip(names, (primary, fallback)):
             if reading.facts.amount(nutrient) is not None:
-                sources[nutrient] = f"{name}:{reading.sources.get(nutrient, '?')}"
+                source = reading.sources.get(nutrient, "?")
+                sources[nutrient] = f"{name}:{source}" if name else source
                 break
     facts = NutritionFacts(
         basis=primary.facts.basis or fallback.facts.basis,
