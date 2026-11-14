@@ -47,6 +47,8 @@ from utils.constants import (
     IMAGES_OUTPUT_DIR,
 )
 from utils.logger import Logger
+from vision.back import pipeline as back_pipeline
+from vision.back.ocr import fetch_models
 
 log = Logger("eval e2e")
 
@@ -167,6 +169,13 @@ def main():
         tasks = pd.Series(tasks).sample(min(args.limit, len(tasks)), random_state=0)
         tasks = list(tasks)
     log.info(f"{len(tasks)} {args.split} products with both photos labeled")
+
+    # RapidOCR loads its models on first use, downloading them: once here,
+    # not in every worker at once (vision/back/ocr.py, fetch_models).
+    models = {back_pipeline.RAPIDOCR_MODEL, back_pipeline.FALLBACK_MODEL} - {None}
+    with ProcessPoolExecutor(1) as pool:
+        for model in sorted(models):
+            pool.submit(fetch_models, model).result()
 
     start = time.perf_counter()
     with ProcessPoolExecutor(args.workers) as pool:

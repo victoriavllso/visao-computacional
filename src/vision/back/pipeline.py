@@ -73,6 +73,14 @@ RAPIDOCR_MODEL = "small"
 # 5 broken, the same at 1 and 2 degrees). Leveling already-straightened
 # crops too: -3 products (8 fixed, 11 broken).
 LEVEL_TEXT = False
+# A second RapidOCR model read on the crop of a readable table only when
+# values are still unread (after the small model and Tesseract), filling only
+# those; None to skip. On dev (OCR cache): medium alone instead of small
+# gives 90.2% vs 90.6% all three right (15 products fixed, 18 broken: they
+# fail on different photos), as this fallback 91.9% (+9, none broken), run
+# on 19% of the photos. Before Tesseract instead of after: 92.0% (+1), but
+# run on 29% of the photos, unreadable ones too.
+FALLBACK_MODEL = "medium"
 
 
 @dataclass
@@ -155,12 +163,13 @@ def _tesseract(cache, key, image):
     return [Word(*row) for row in rows]
 
 
-def _rapidocr(cache, key, image, level=False):
+def _rapidocr(cache, key, image, level=False, model=None):
     """RapidOCR's words (one per text line) on a color image; `level` turns
     tilted text level (ocr.words_from_lines)."""
-    key = f"{key}_{RAPIDOCR_MODEL}"
+    model = model or RAPIDOCR_MODEL
+    key = f"{key}_{model}"
     return words_from_lines(
-        _ocr(cache, key, image, lambda: rapidocr_lines(image, RAPIDOCR_MODEL)),
+        _ocr(cache, key, image, lambda: rapidocr_lines(image, model)),
         level=level and LEVEL_TEXT,
     )
 
@@ -235,6 +244,21 @@ def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0) -> BackR
 
             save_ocr_rapidocr(debug_dir, crop, learned)
 
+    # Stage 3b: the larger model on the same crop, for what is still unread.
+    if (
+        ENGINE == "combined"
+        and FALLBACK_MODEL
+        and FALLBACK_MODEL != RAPIDOCR_MODEL
+        and photo_type.readable
+        and _missing(reading)
+    ):
+        larger = _rapidocr(
+            cache, prefix + "rapidocr", crop, not straight, FALLBACK_MODEL
+        )
+        reading = combine(
+            reading, parse_table(larger), names=(None, f"rapidocr_{FALLBACK_MODEL}")
+        )
+
     # Stage 4: the table's box lost what was missing; the whole photo may
     # have it. Only when a box was cut (otherwise RapidOCR already read the
     # whole photo) and the crop left something to find.
@@ -264,6 +288,10 @@ def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0) -> BackR
         save_summary(debug_dir, result)
 
     return result
+
+
+def _missing(reading):
+    return any(reading.facts.amount(nutrient) is None for nutrient in Nutrient)
 
 
 def needs_full_photo(photo_type, reading):
