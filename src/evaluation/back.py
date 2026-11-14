@@ -36,6 +36,7 @@ os.environ.setdefault("ORT_THREADS", "1")
 sys.path.append(str(Path(__file__).parent.parent))
 
 import pandas as pd
+from tqdm import tqdm
 
 from labeling.labels import load_labels, truth_facts
 from rules.anvisa import Nutrient, NutritionFacts, assess
@@ -721,10 +722,15 @@ def main():
         # Sequential: clearer console output and avoids cross-process I/O
         # races writing debug images.
         log.info(f"Debug mode: processing {len(tasks)} products sequentially")
-        results = pd.DataFrame([evaluate_product(t) for t in tasks])
+        results = pd.DataFrame(
+            [evaluate_product(t) for t in tqdm(tasks, unit="product")]
+        )
     else:
         with ProcessPoolExecutor(args.workers) as pool:
-            results = pd.DataFrame(pool.map(evaluate_product, tasks, chunksize=4))
+            # Results come in order (a slow product holds the bar back a
+            # little); the order of the CSV doesn't change.
+            mapped = pool.map(evaluate_product, tasks, chunksize=4)
+            results = pd.DataFrame(list(tqdm(mapped, total=len(tasks), unit="product")))
     elapsed = time.perf_counter() - start
     log.info(f"Done in {elapsed:.0f} s")
     if args.ocr_cache and "ocr_cache_hits" in results:
