@@ -1,6 +1,6 @@
 import pytest
 
-from rules.anvisa import Basis
+from rules.anvisa import Basis, Nutrient
 from vision.back.parse import Word, group_rows, parse_number, parse_table
 
 
@@ -159,6 +159,11 @@ def test_rows_group_despite_small_vertical_offsets():
         ("12.000", 12000),
         ("0.500", 0.5),
         ("1.5", 1.5),
+        # A lost decimal comma: integers have no leading zero.
+        ("06", 0.6),
+        ("012g", 0.12),
+        ("00", 0.0),
+        ("0", 0),
     ],
 )
 def test_parse_number(text, expected):
@@ -421,3 +426,101 @@ def test_combine_names_the_engine_of_each_value():
     assert sources[Nutrient.SODIUM] == "rapidocr:first_right"
     assert sources[Nutrient.SATURATED_FAT] == "tesseract:first_right"
     assert Nutrient.ADDED_SUGARS not in sources
+
+
+def test_linear_value_on_the_next_line():
+    # The label ends a line of running text; its value starts the next one.
+    words = [
+        *sentence(
+            0,
+            "64g (29 g, 10%), dos quais Açúcares totais 55 g (25 g), Açúcares adicionados",
+        ),
+        *sentence(40, "46g (21 g, 42%) Proteínas 4,5 g (2 g, 4%) Gorduras totais 26 g"),
+        *sentence(80, "(12 g, 18%), das quais Gorduras saturadas"),
+        *sentence(120, "15 g (6,7 g, 34%), Gorduras trans 0 g (0 g, 0%) Sódio 157 mg"),
+    ]
+    reading = parse_table(words)
+
+    assert reading.facts.added_sugars_g == 46
+    assert reading.facts.saturated_fat_g == 15
+    assert reading.facts.sodium_mg == 157
+    assert reading.sources[Nutrient.ADDED_SUGARS] == "next_line"
+
+
+def test_next_line_needs_the_nutrients_unit():
+    # The net weight under an 'ALTO EM SÓDIO' panel isn't sodium.
+    words = [*sentence(0, "ALTO EM GORDURA SATURADA SÓDIO"), *sentence(40, "180 g")]
+    assert parse_table(words).facts.sodium_mg is None
+    # A table row read backwards (photo turned the wrong way): no unit.
+    words = [
+        *sentence(0, "18 9,1 30 Açúcares adicionados (g)"),
+        *sentence(40, "9,2 31 Açúcares totais (g)"),
+    ]
+    assert parse_table(words).facts.added_sugars_g is None
+
+
+def test_value_glued_to_the_label():
+    words = [
+        Word("AçúcaresadicionadosOg", 0, 0, 210, 20),
+        Word("(0g,0%)", 220, 0, 70, 20),
+        Word("GordurassaturadasOg", 0, 40, 190, 20),
+        Word("Sódio14mg", 0, 80, 90, 20),
+    ]
+    facts = parse_table(words).facts
+
+    assert (facts.added_sugars_g, facts.saturated_fat_g, facts.sodium_mg) == (0, 0, 14)
+
+
+def test_not_significant_long_list_and_cut_word():
+    # The list of a simplified table is long; sodium comes last.
+    words = sentence(
+        0,
+        "Não contém quantidades significativas de carboidratos, açúcares totais,"
+        " açúcares adicionados, proteínas, gorduras totais, gorduras saturadas,"
+        " gorduras trans, fibras alimentares e sódio.",
+    )
+    assert parse_table(words).facts.sodium_mg == 0
+    # 'significativas' cut by the OCR.
+    words = sentence(0, "Não contém quantidades signific adicionados e sódio")
+    facts = parse_table(words).facts
+    assert (facts.added_sugars_g, facts.sodium_mg) == (0, 0)
+
+
+def table_row(y, label, *values):
+    """A table row: the label's words, then its values in columns."""
+    words = label.split()
+    return row(
+        y,
+        *[(90 * i, w) for i, w in enumerate(words)],
+        *[(400 + 100 * i, v) for i, v in enumerate(values)],
+    )
+
+
+def test_part_larger_than_its_total_lost_its_decimal_comma():
+    words = [
+        *table_row(0, "Gorduras totais (g)", "13", "4"),
+        *table_row(40, "Gorduras saturadas (g)", "47", "1,4"),
+        *table_row(80, "Açúcares totais (g)", "15", "4,5"),
+        *table_row(120, "Açúcares adicionados (g)", "60", "18"),
+    ]
+    reading = parse_table(words)
+
+    assert reading.facts.saturated_fat_g == 4.7
+    assert reading.facts.added_sugars_g == 6
+    assert reading.sources[Nutrient.SATURATED_FAT] == "first_right/10"
+    assert reading.totals == {"total_fat": 13, "total_sugars": 15}
+
+
+def test_part_larger_than_its_total_otherwise():
+    # Too large even divided: unknown.
+    words = [
+        *table_row(0, "Gorduras totais (g)", "1", "0,3"),
+        *table_row(40, "Gorduras saturadas (g)", "47", "1,4"),
+    ]
+    assert parse_table(words).facts.saturated_fat_g is None
+    # A value with decimals kept its comma: the total may be the misreading.
+    words = [
+        *table_row(0, "Gorduras totais (g)", "7", "2"),
+        *table_row(40, "Gorduras saturadas (g)", "8,4", "2,5"),
+    ]
+    assert parse_table(words).facts.saturated_fat_g == 8.4

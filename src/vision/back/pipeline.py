@@ -66,6 +66,13 @@ ORIENT = True
 FULL_PHOTO_FALLBACK = True
 # RapidOCR's PP-OCRv6 model size: "small" or "medium" (vision/back/ocr.py).
 RAPIDOCR_MODEL = "small"
+# Level RapidOCR's tilted text lines before grouping rows, on images that
+# weren't straightened (no table located, the whole photo):
+# ocr.words_from_lines. Measured on dev and off: whole-photo values right
+# 68% -> 82%, but decisions unchanged (all three right -1 product: 4 fixed,
+# 5 broken, the same at 1 and 2 degrees). Leveling already-straightened
+# crops too: -3 products (8 fixed, 11 broken).
+LEVEL_TEXT = False
 
 
 @dataclass
@@ -148,11 +155,13 @@ def _tesseract(cache, key, image):
     return [Word(*row) for row in rows]
 
 
-def _rapidocr(cache, key, image):
-    """RapidOCR's words (one per text line) on a color image."""
+def _rapidocr(cache, key, image, level=False):
+    """RapidOCR's words (one per text line) on a color image; `level` turns
+    tilted text level (ocr.words_from_lines)."""
     key = f"{key}_{RAPIDOCR_MODEL}"
     return words_from_lines(
-        _ocr(cache, key, image, lambda: rapidocr_lines(image, RAPIDOCR_MODEL))
+        _ocr(cache, key, image, lambda: rapidocr_lines(image, RAPIDOCR_MODEL)),
+        level=level and LEVEL_TEXT,
     )
 
 
@@ -170,6 +179,8 @@ def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0) -> BackR
 
     table = locate_table(image, debug_dir=debug_dir) if locate else None
     crop = table.image if table is not None else image
+    # A located table is already straightened; the whole photo isn't.
+    straight = table is not None and table.box is not None
 
     # Stage 1, before OCR: only photos with almost no text are rejected.
     if table is not None and table.text_blobs < MIN_TEXT_BLOBS:
@@ -184,7 +195,7 @@ def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0) -> BackR
 
     # Stage 2, after the fast OCR: the format is in the text.
     if ENGINE == "rapidocr":
-        words = _rapidocr(cache, prefix + "rapidocr", crop)
+        words = _rapidocr(cache, prefix + "rapidocr", crop, not straight)
         reading = parse_table(words)
         if debug_dir is not None:
             from vision.back.debug import save_ocr_rapidocr
@@ -214,7 +225,7 @@ def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0) -> BackR
     needs_learned = photo_type is not PhotoType.OLD_FORMAT
     learned = words if ENGINE == "rapidocr" else []
     if ENGINE == "combined" and (needs_learned or not GATE_LEARNED_OCR):
-        learned = _rapidocr(cache, prefix + "rapidocr", crop)
+        learned = _rapidocr(cache, prefix + "rapidocr", crop, not straight)
         reading = combine(parse_table(learned), reading)
         photo_features = features(table, words + learned, reading)
         photo_type = classify(photo_features)
@@ -234,7 +245,7 @@ def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0) -> BackR
         and table.box is not None
         and needs_full_photo(photo_type, reading)
     ):
-        full = _rapidocr(cache, prefix + "rapidocr_full", image)
+        full = _rapidocr(cache, prefix + "rapidocr_full", image, level=True)
         reading = combine(reading, parse_table(full), names=(None, "rapidocr_full"))
         if not photo_type.readable:
             photo_features = features(table, words + learned + full, reading)

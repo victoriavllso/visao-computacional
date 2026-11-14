@@ -9,7 +9,9 @@ ruled lines. Curved or wrinkled packages bend the lines, rows get merged,
 and the decision accuracy on dev fell from 27% to 12%.
 """
 
+import math
 import os
+import statistics
 
 import cv2
 import numpy as np
@@ -212,8 +214,37 @@ def rapidocr_lines(image, model="small") -> list:
     ]
 
 
-def words_from_lines(lines) -> list[Word]:
-    """One Word per RapidOCR text line, on the line's upright bounding box."""
+# Text lines leveled before grouping rows when they tilt by more than this
+# (degrees): at 2 degrees, text drifts by more than half a row across a
+# 1000 px table. Larger tilts are text turned on its side, for orient.py.
+MIN_TILT, MAX_TILT = 1.0, 20.0
+
+
+def text_tilt(lines):
+    """Median angle (degrees, clockwise) of the long text lines, from their
+    boxes' top edges; None with fewer than 3 such lines."""
+    angles = []
+    for box, text, _ in lines:
+        (x0, y0), (x1, y1), _, (x3, y3) = box
+        width, height = math.hypot(x1 - x0, y1 - y0), math.hypot(x3 - x0, y3 - y0)
+        if len(text.strip()) >= 4 and width >= 3 * height:
+            angles.append(math.degrees(math.atan2(y1 - y0, x1 - x0)))
+    return statistics.median(angles) if len(angles) >= 3 else None
+
+
+def words_from_lines(lines, level=False) -> list[Word]:
+    """One Word per RapidOCR text line, on the line's upright bounding box.
+    `level`: on a tilted photo (the table wasn't located and straightened,
+    or the whole photo is read), turn the coordinates so the text lines are
+    horizontal, so that the words of a row share a height."""
+    tilt = text_tilt(lines) if level else None
+    if tilt is not None and MIN_TILT <= abs(tilt) <= MAX_TILT:
+        cos, sin = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
+        lines = [
+            [[[x * cos + y * sin, -x * sin + y * cos] for x, y in box], text, score]
+            for box, text, score in lines
+        ]
+
     words = []
     for box, text, score in lines:
         xs, ys = [p[0] for p in box], [p[1] for p in box]
