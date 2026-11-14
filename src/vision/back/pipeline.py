@@ -3,7 +3,7 @@
 photo ─► locate + straighten table ─► OCR ─► parse rows ─► NutritionFacts
 """
 
-from dataclasses import dataclass, field, replace
+from dataclasses import astuple, dataclass, field, replace
 
 import cv2
 
@@ -15,8 +15,9 @@ from vision.back.ocr import (
     TARGET_TEXT_HEIGHT,
     prepare,
     read_row,
+    rapidocr_lines,
     read_words,
-    read_words_rapidocr,
+    words_from_lines,
 )
 from vision.back.parse import (
     Reading,
@@ -63,6 +64,8 @@ ORIENT = True
 # far left), and bent bottom rows fall outside. Tesseract keeps the crop (it
 # needs the scaling and binarization); RapidOCR reads whole photos well.
 FULL_PHOTO_FALLBACK = True
+# RapidOCR's PP-OCRv6 model size: "small" or "medium" (vision/back/ocr.py).
+RAPIDOCR_MODEL = "small"
 
 
 @dataclass
@@ -84,23 +87,25 @@ class BackResult:
 
 
 def read_back(
-    image, locate=True, preprocess=True, debug_dir=None, orient=ORIENT
+    image, locate=True, preprocess=True, debug_dir=None, orient=ORIENT, cache=None
 ) -> BackResult:
     """`locate` and `preprocess` switch the classical steps off, to measure
     what each one adds.  `debug_dir`, when set, saves intermediate images and
-    a JSON summary to that directory."""
+    a JSON summary to that directory. `cache`, an OcrCache of this photo
+    (vision/back/cache.py), returns stored OCR results instead of running
+    the OCR again."""
     if isinstance(image, str):
         path, image = image, cv2.imread(image)
         if image is None:
             raise FileNotFoundError(path)
 
-    result, rotation = _read(image, locate, preprocess, debug_dir), 0
+    result, rotation = _read(image, locate, preprocess, debug_dir, cache), 0
     if not orient:
         return result
     # OSD only suggests a turn: it also asked for 180 degrees on upright
     # photos the parser read right (dev, confidence up to 4.6). Each turn is
     # kept only if the photo reads better turned; ties keep the photo as is.
-    suggested = osd_rotation(image)
+    suggested = _ocr(cache, "osd", image, lambda: osd_rotation(image))
     if suggested:
         candidates = [suggested]
     elif vertical_text(result.lines):
@@ -109,7 +114,9 @@ def read_back(
     else:
         candidates = []
     for degrees in candidates:
-        candidate = _read(rotate(image, degrees), locate, preprocess, None)
+        candidate = _read(
+            rotate(image, degrees), locate, preprocess, None, cache, degrees
+        )
         if reading_score(candidate) > reading_score(result):
             result, rotation = candidate, degrees
     return replace(result, rotation=rotation)
@@ -126,7 +133,32 @@ def reading_score(result):
     return (result.readable, values + bool(result.reading.headers))
 
 
-def _read(image, locate, preprocess, debug_dir) -> BackResult:
+def _ocr(cache, key, image, compute):
+    """compute(), or its stored result when a cache is given."""
+    return compute() if cache is None else cache.get(key, image, compute)
+
+
+def _tesseract(cache, key, image):
+    """Tesseract's words on an image already preprocessed."""
+    if cache is None:
+        return read_words(image, preprocess=False)
+    rows = cache.get(
+        key, image, lambda: [astuple(w) for w in read_words(image, preprocess=False)]
+    )
+    return [Word(*row) for row in rows]
+
+
+def _rapidocr(cache, key, image):
+    """RapidOCR's words (one per text line) on a color image."""
+    key = f"{key}_{RAPIDOCR_MODEL}"
+    return words_from_lines(
+        _ocr(cache, key, image, lambda: rapidocr_lines(image, RAPIDOCR_MODEL))
+    )
+
+
+def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0) -> BackResult:
+    # Cache keys: rotation and classical steps, then the OCR call.
+    prefix = f"r{rotation}/{'' if locate else 'nolocate/'}"
     if debug_dir is not None:
         from pathlib import Path
 
@@ -152,7 +184,7 @@ def _read(image, locate, preprocess, debug_dir) -> BackResult:
 
     # Stage 2, after the fast OCR: the format is in the text.
     if ENGINE == "rapidocr":
-        words = read_words_rapidocr(crop)
+        words = _rapidocr(cache, prefix + "rapidocr", crop)
         reading = parse_table(words)
         if debug_dir is not None:
             from vision.back.debug import save_ocr_rapidocr
@@ -160,7 +192,9 @@ def _read(image, locate, preprocess, debug_dir) -> BackResult:
             save_ocr_rapidocr(debug_dir, crop, words)
     else:
         clean = prepare(crop) if preprocess else crop
-        words = read_words(clean, preprocess=False)
+        words = _tesseract(
+            cache, prefix + ("tesseract" if preprocess else "tesseract_raw"), clean
+        )
         reading = parse_table(words)
         if REFINE and preprocess:
             reading = refine(clean, reading)
@@ -180,7 +214,7 @@ def _read(image, locate, preprocess, debug_dir) -> BackResult:
     needs_learned = photo_type is not PhotoType.OLD_FORMAT
     learned = words if ENGINE == "rapidocr" else []
     if ENGINE == "combined" and (needs_learned or not GATE_LEARNED_OCR):
-        learned = read_words_rapidocr(crop)
+        learned = _rapidocr(cache, prefix + "rapidocr", crop)
         reading = combine(parse_table(learned), reading)
         photo_features = features(table, words + learned, reading)
         photo_type = classify(photo_features)
@@ -200,7 +234,7 @@ def _read(image, locate, preprocess, debug_dir) -> BackResult:
         and table.box is not None
         and needs_full_photo(photo_type, reading)
     ):
-        full = read_words_rapidocr(image)
+        full = _rapidocr(cache, prefix + "rapidocr_full", image)
         reading = combine(reading, parse_table(full), names=(None, "rapidocr_full"))
         if not photo_type.readable:
             photo_features = features(table, words + learned + full, reading)

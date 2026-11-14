@@ -10,7 +10,12 @@ Two levels:
 Each metric only counts products whose true value (or decision) is known.
 
     python src/evaluation/back.py --split dev [--limit 100] [--hand-only]
-        [--no-locate] [--no-preprocess] [--tag name]
+        [--no-locate] [--no-preprocess] [--tag name] [--ocr-cache]
+        [--rapidocr-model small|medium]
+
+--ocr-cache reads the OCR results stored in data/cache/back_ocr/ and stores
+the missing ones (vision/back/cache.py): rule changes after the OCR are then
+scored without running it again (times are then meaningless).
 """
 
 import argparse
@@ -36,6 +41,8 @@ from labeling.labels import load_labels, truth_facts
 from rules.anvisa import Nutrient, NutritionFacts, assess
 from utils.constants import DATA_DIR, FILTER_PAIRS_OUTPUT_FILE, IMAGES_OUTPUT_DIR
 from utils.logger import Logger
+from vision.back import pipeline
+from vision.back.cache import OcrCache
 from vision.back.classify import STATUS_TYPES, PhotoType
 from vision.back.pipeline import read_back
 
@@ -57,8 +64,11 @@ def matches(read, truth, nutrient):
 
 
 def evaluate_product(args):
-    product, labels, locate, preprocess, debug = args
+    product, labels, locate, preprocess, debug, use_cache, model = args
     product = SimpleNamespace(**product)
+    # Set in the worker: spawned processes don't inherit the parent's.
+    pipeline.RAPIDOCR_MODEL = model
+    cache = OcrCache(product.code) if use_cache else None
     debug_dir = str(EVAL_DIR.parent / "debug" / str(product.code)) if debug else None
     path = IMAGES_OUTPUT_DIR / "nutrition" / f"{product.code}.jpg"
     truth, source = truth_facts(product, labels)
@@ -74,12 +84,20 @@ def evaluate_product(args):
 
     try:
         result = read_back(
-            str(path), locate=locate, preprocess=preprocess, debug_dir=debug_dir
+            str(path),
+            locate=locate,
+            preprocess=preprocess,
+            debug_dir=debug_dir,
+            cache=cache,
         )
     except Exception as error:
         row["error"] = repr(error)
         log.error(f"Error reading {product.code}: {error}")
         return row
+    finally:
+        if cache is not None:
+            cache.save()
+            row.update({f"ocr_cache_{k}": v for k, v in cache.stats.items()})
 
     row["photo_type"] = result.photo_type.value
     row.update({f"f_{k}": v for k, v in vars(result.features).items()})
@@ -658,6 +676,17 @@ def parse_args():
     parser.add_argument("--no-preprocess", action="store_true")
     parser.add_argument("--workers", type=int, default=os.cpu_count())
     parser.add_argument(
+        "--ocr-cache",
+        action="store_true",
+        help="reuse the OCR results in data/cache/back_ocr/, store the missing ones",
+    )
+    parser.add_argument(
+        "--rapidocr-model",
+        default=pipeline.RAPIDOCR_MODEL,
+        choices=["small", "medium"],
+        help="PP-OCRv6 model size for RapidOCR",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="save intermediate CV/OCR images to data/debug/<code>/",
@@ -677,7 +706,8 @@ def main():
 
     locate, preprocess = not args.no_locate, not args.no_preprocess
     tasks = [
-        (p, labels, locate, preprocess, args.debug) for p in products.to_dict("records")
+        (p, labels, locate, preprocess, args.debug, args.ocr_cache, args.rapidocr_model)
+        for p in products.to_dict("records")
     ]
 
     start = time.perf_counter()
@@ -691,11 +721,22 @@ def main():
             results = pd.DataFrame(pool.map(evaluate_product, tasks, chunksize=4))
     elapsed = time.perf_counter() - start
     log.info(f"Done in {elapsed:.0f} s")
+    if args.ocr_cache and "ocr_cache_hits" in results:
+        totals = {
+            k: int(results[f"ocr_cache_{k}"].sum())
+            for k in ("hits", "misses", "changed")
+        }
+        log.info(
+            f"OCR cache: {totals['hits']} calls reused ({totals['changed']} of them"
+            f" on a slightly different input), {totals['misses']} run and stored"
+        )
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     variant = (
         f"{'locate' if locate else 'nolocate'}_{'prep' if preprocess else 'noprep'}"
     )
+    if args.rapidocr_model != "small":
+        variant += f"_{args.rapidocr_model}"
     run_name = f"{timestamp}_{args.tag or variant}"
     run_dir = EVAL_DIR / f"back_{args.split}_{run_name}"
     run_dir.mkdir(parents=True, exist_ok=True)
