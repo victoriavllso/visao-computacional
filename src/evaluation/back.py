@@ -714,8 +714,10 @@ def main():
 
     # Models present and checked before the workers start, in a process of
     # its own (forked workers must not inherit an ONNX Runtime session).
+    models = {args.rapidocr_model, pipeline.FALLBACK_MODEL} - {None}
     with ProcessPoolExecutor(1) as pool:
-        pool.submit(fetch_models, args.rapidocr_model).result()
+        for model in sorted(models):
+            pool.submit(fetch_models, model).result()
 
     start = time.perf_counter()
     if args.debug:
