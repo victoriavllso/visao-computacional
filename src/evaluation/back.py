@@ -43,6 +43,7 @@ from utils.constants import DATA_DIR, FILTER_PAIRS_OUTPUT_FILE, IMAGES_OUTPUT_DI
 from utils.logger import Logger
 from vision.back import pipeline
 from vision.back.cache import OcrCache
+from vision.back.ocr import fetch_models
 from vision.back.classify import STATUS_TYPES, PhotoType
 from vision.back.pipeline import read_back
 
@@ -709,6 +710,11 @@ def main():
         (p, labels, locate, preprocess, args.debug, args.ocr_cache, args.rapidocr_model)
         for p in products.to_dict("records")
     ]
+
+    # Models present and checked before the workers start, in a process of
+    # its own (forked workers must not inherit an ONNX Runtime session).
+    with ProcessPoolExecutor(1) as pool:
+        pool.submit(fetch_models, args.rapidocr_model).result()
 
     start = time.perf_counter()
     if args.debug:

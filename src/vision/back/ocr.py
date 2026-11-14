@@ -198,6 +198,20 @@ def _engine(model):
     return _rapidocr[model]
 
 
+def fetch_models(model="small"):
+    """Download (and checksum) the RapidOCR models of `model` if missing.
+    RapidOCR loads each model on its first use, downloading it straight to
+    the final path, with a lock only inside one process: parallel workers
+    each download the same file and load it half-written
+    ('INVALID_PROTOBUF', server: 32 workers, medium models). Run this once,
+    before starting them. The loaders are RapidOCR's own (private; version
+    pinned in pixi.lock): an OCR call on a blank image wouldn't load the
+    recognition model, nothing being detected."""
+    engine = _engine(model)
+    for load in ("_load_det_model", "_load_cls_model", "_load_rec_model"):
+        getattr(engine, load)()
+
+
 def rapidocr_lines(image, model="small") -> list:
     """RapidOCR's raw output as plain lists, [[box, text, score], ...], box
     being the four corners [[x, y], ...] of the text line (it may be
