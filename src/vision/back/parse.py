@@ -46,6 +46,8 @@ class Reading:
     # "not_significant", "refine"; after combining engines, prefixed with
     # the engine ("rapidocr:column").
     sources: dict = field(default_factory=dict)
+    # Amounts of the rows that bound the nutrients' (TOTALS), when read.
+    totals: dict = field(default_factory=dict)
 
 
 # Distinctive words of each label (full and abbreviated: 'Aç. adic.',
@@ -78,6 +80,10 @@ NUMBER = re.compile(r"^[<≤]?(\d+(?:[.,]\d+)?)(mg|g|ml)?$")
 # Brazilian tables write decimals with a comma and may group thousands with
 # a dot: "1.180 mg" is 1180 (dev: two sodium values read as 1.18 and 1.047).
 THOUSANDS = re.compile(r"^[1-9]\d{0,2}\.\d{3}$")
+# An integer is never printed with a leading zero: '06' is '0,6' with the
+# comma lost (RapidOCR drops small commas; dev: 0,6 g of saturated fat read
+# as 6).
+LEADING_ZERO = re.compile(r"^0\d+$")
 
 # Physical limits per 100 g/ml: no nutrient weighs more than the food, and
 # pure salt has ~39,000 mg of sodium per 100 g. A larger reading is an OCR
@@ -125,6 +131,8 @@ def parse_number(text):
     number = match.group(1)
     if THOUSANDS.match(number):
         number = number.replace(".", "")
+    elif LEADING_ZERO.match(number):
+        number = "0." + number[1:]
     return float(number.replace(",", "."))
 
 
@@ -165,6 +173,44 @@ def split_word(word):
             word.conf,
         )
         for token in TOKEN.finditer(word.text)
+    ]
+
+
+# A label with its value glued on, as the learned OCR reads tight linear
+# text: 'AçúcaresadicionadosOg', 'GordurassaturadasOg', 'Sódio14mg'. The
+# value starts with a digit, or with 'O' read for 0 when a unit follows.
+GLUED_VALUE = re.compile(
+    r"^(.*(?:adicionad[oa]s|saturadas|s[oó]dio))"
+    r"((?:\d[\d.,]*|[Oo](?=\s*m?g))\s*(?:mg|g)?)$",
+    re.IGNORECASE,
+)
+
+
+def split_glued(word):
+    """'AçúcaresadicionadosOg' → 'Açúcaresadicionados', 'Og' (each with its
+    share of the box width)."""
+    match = GLUED_VALUE.match(word.text)
+    if not match:
+        return [word]
+    per_char = word.w / max(len(word.text), 1)
+    cut = len(match.group(1))
+    return [
+        Word(
+            match.group(1),
+            word.x,
+            word.y,
+            max(1, int(cut * per_char)),
+            word.h,
+            word.conf,
+        ),
+        Word(
+            match.group(2),
+            int(word.x + cut * per_char),
+            word.y,
+            max(1, int((len(word.text) - cut) * per_char)),
+            word.h,
+            word.conf,
+        ),
     ]
 
 
@@ -245,6 +291,46 @@ def value_after(row, index):
             return None
 
     return None
+
+
+def ends_line(row, index):
+    """The label is the last word of its row: only units or punctuation
+    after it."""
+    return all(is_unit(word) for word in row[index + 1 :])
+
+
+def value_on_next_line(rows, row, index, unit):
+    """Linear text wraps: the label ends one line and its value starts the
+    next ('..., Açúcares adicionados' / '46 g (21 g, 42%) Proteínas ...';
+    dev: ~10 values). Only for running text (words before the label on its
+    row, so not a table's label column), only the next line's first word,
+    when it starts left of the label, and only with the nutrient's unit
+    glued or next to it: running text always writes it, while a table row
+    read backwards on a photo turned the wrong way ('9,1 30 Açúcares
+    adicionados (g)') or the net weight under an 'ALTO EM SÓDIO' panel
+    ('180 g') don't have it."""
+    if index == 0 or not ends_line(row, index):
+        return None
+    position = rows.index(row)
+    if position + 1 >= len(rows):
+        return None
+    following = rows[position + 1]
+    first = following[0]
+    if first.x >= row[index].x or is_unit(first):
+        return None
+    glued = re.sub(r"^[^\d]*[\d.,]+", "", first.text).lower()
+    after = normalize(following[1].text) if len(following) > 1 else ""
+    if unit not in (glued, after):
+        return None
+    return parse_number(first.text)
+
+
+# The unit each nutrient is declared in.
+UNITS = {
+    Nutrient.ADDED_SUGARS: "g",
+    Nutrient.SATURATED_FAT: "g",
+    Nutrient.SODIUM: "mg",
+}
 
 
 def value_near(words, label):
@@ -334,8 +420,15 @@ def value_in_column(words, label, headers):
 # declaring them in a sentence: "Não contém quantidades significativas de
 # açúcares adicionados, gorduras saturadas e sódio". Those amounts count as
 # zero. Normalized text (no spaces or accents), as OCR often drops spaces.
-NOT_SIGNIFICANT = "significativ"
-NOT_SIGNIFICANT_SPAN = 120  # characters of the nutrient list after it
+# 'signific', not 'significativ': the word is often cut ('signific
+# adicionados', dev: 1 product). 250 characters of list: the full list of a
+# simplified table ('... carboidratos, açúcares totais, açúcares adicionados,
+# proteínas, gorduras totais, gorduras saturadas, gorduras trans, fibras
+# alimentares e sódio') is ~140 without spaces, and two-column labels mix in
+# other text (dev: 2 products lost sodium at 120); it still ends at
+# '*Percentual'.
+NOT_SIGNIFICANT = "signific"
+NOT_SIGNIFICANT_SPAN = 250  # characters of the nutrient list after it
 NOT_SIGNIFICANT_KEYS = {
     # 'açúcares' alone covers total and added sugars.
     Nutrient.ADDED_SUGARS: ("adicionad", "acucar"),
@@ -365,13 +458,78 @@ def not_significant(rows):
     return found
 
 
+# Rows whose amounts bound a nutrient's: saturated fat is part of the total
+# fat, added sugars of the total sugars, which are part of the carbohydrates.
+# (first word, distinctive word): 'Gorduras totais', 'Gord. totais',
+# 'Gordurastotais'; the carbohydrates row has one word.
+TOTALS = {
+    "total_fat": (("gordura", "gord"), "totais"),
+    "total_sugars": (("acucar", "acuc"), "totais"),
+    "carbohydrates": ((), "carboidratos"),
+}
+# Printed amounts are rounded: a part may exceed its total by that much.
+TOTAL_TOLERANCE = 0.1
+
+
+def find_total(row, kind):
+    """Index of the distinctive word of a TOTALS row, or None."""
+    firsts, key = TOTALS[kind]
+    for i, word in enumerate(row):
+        token = normalize(UNIT_SUFFIX.sub("", word.text))
+        if len(token) < 5:
+            continue
+        if not firsts:
+            if token.startswith(key[:8]) or similarity(token, key) >= MIN_SIMILARITY:
+                return i
+            continue
+        if any(token.startswith(f) for f in firsts) and token.endswith(key):
+            return i
+        previous = normalize(row[i - 1].text) if i else ""
+        if similarity(token, key) >= MIN_SIMILARITY and any(
+            previous.startswith(f) for f in firsts
+        ):
+            return i
+    return None
+
+
+def row_value(rows, row, index, headers, unit):
+    """The value of the label at row[index], from its own row (the '100 g'
+    column, else the first number right of it), else from the next line of
+    running text; with the rule that gave it."""
+    label = row[index]
+    value, rule = value_in_column(row[index + 1 :], label, headers), "column"
+    if value is None:
+        value, rule = value_after(row, index), "first_right"
+    if value is None:
+        value, rule = value_on_next_line(rows, row, index, unit), "next_line"
+    return value, rule
+
+
+def bounded(value, bound):
+    """A part checked against its total: the value if it fits; when it
+    doesn't and it is a whole number, a tenth of it if that fits (the decimal
+    comma lost: '4,7' read as 47), else None. A part with decimals kept its
+    comma, so the total is as likely misread: kept (dev: 8,4 g of saturated
+    fat under a total read as 7, 1,4 g of added sugars under 1)."""
+    if bound is None or value <= bound + TOTAL_TOLERANCE or value != int(value):
+        return value, ""
+    if value / 10 <= bound + TOTAL_TOLERANCE:
+        return value / 10, "/10"
+    return None, ""
+
+
 def parse_table(words) -> Reading:
     # Rows are grouped on whole OCR boxes, then each box is split in place:
     # splitting first interleaves the tokens of two boxes grouped into one
     # row ('Fibras alimentares (g)' over 'Sódio (mg)' read as 'Fibras Sódio
     # alimentares (mg) (g)', dev: 1110 mg of sodium read as 0).
     rows = [
-        [token for word in row for token in split_word(word)]
+        [
+            piece
+            for word in row
+            for token in split_word(word)
+            for piece in split_glued(token)
+        ]
         for row in group_rows(words)
     ]
     headers = find_headers(rows)
@@ -391,9 +549,7 @@ def parse_table(words) -> Reading:
             # Same row first; other words only when the row has no value
             # (curved tables push values out of their row).
             label = row[index]
-            value, rule = value_in_column(row[index + 1 :], label, headers), "column"
-            if value is None:
-                value, rule = value_after(row, index), "first_right"
+            value, rule = row_value(rows, row, index, headers, UNITS[nutrient])
             if value is None and NEARBY_ROWS:
                 value, rule = value_in_column(words, label, headers), "column_rows"
             if value is None and NEARBY_ROWS:
@@ -421,6 +577,33 @@ def parse_table(words) -> Reading:
             matches[nutrient] = ("não contém quantidades significativas", 0.0)
             sources[nutrient] = "not_significant"
 
+    # A part larger than its total is a misreading of one of them (dev: 47 g
+    # of saturated fat under 13 g of total fat; 60 g of added sugars under
+    # 15 g of sugars): a tenth of it, or unknown.
+    totals = {}
+    for kind in TOTALS:
+        for row in table_rows:
+            index = find_total(row, kind)
+            if index is None:
+                continue
+            value, _ = row_value(rows, row, index, headers, "g")
+            if value is not None and 0 <= value <= 100:
+                totals[kind] = value
+                break
+    bounds = {
+        Nutrient.SATURATED_FAT: totals.get("total_fat"),
+        Nutrient.ADDED_SUGARS: totals.get("total_sugars", totals.get("carbohydrates")),
+    }
+    for nutrient, bound in bounds.items():
+        if nutrient not in values:
+            continue
+        value, fix = bounded(values[nutrient], bound)
+        if value is None:
+            del values[nutrient], sources[nutrient], matches[nutrient]
+        elif fix:
+            values[nutrient] = value
+            sources[nutrient] += fix
+
     facts = NutritionFacts(
         basis=headers[0].basis if headers else None,
         added_sugars_g=values.get(Nutrient.ADDED_SUGARS),
@@ -434,4 +617,5 @@ def parse_table(words) -> Reading:
         value_spans=spans,
         headers=headers,
         sources=sources,
+        totals=totals,
     )

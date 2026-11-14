@@ -82,3 +82,32 @@ def test_cached_words_equal_fresh_ones(tmp_path, monkeypatch):
     )
     assert cached == fresh
     assert reloaded.stats["misses"] == 0
+
+
+def test_tilted_lines_are_leveled():
+    """Words of one tilted row share a height once leveled."""
+    import math
+
+    from vision.back.ocr import text_tilt, words_from_lines
+    from vision.back.parse import group_rows
+
+    def tilted(x, y, w, h, text, degrees=4):
+        t = math.radians(degrees)
+        corners = [(0, 0), (w, 0), (w, h), (0, h)]
+        box = [
+            [
+                x + cx * math.cos(t) - cy * math.sin(t),
+                y + cx * math.sin(t) + cy * math.cos(t),
+            ]
+            for cx, cy in corners
+        ]
+        return [box, text, 0.9]
+
+    # A row's label at the left, its value 800 px to the right: at 4 degrees
+    # the value sits 56 px lower, more than a row.
+    lines = [tilted(0, 100 * i, 300, 30, f"Linha número {i}") for i in range(3)]
+    lines.append(tilted(800, 56, 60, 30, "12,5"))
+    assert round(text_tilt(lines)) == 4
+    assert len(group_rows(words_from_lines(lines))) == 4
+    leveled = group_rows(words_from_lines(lines, level=True))
+    assert [w.text for w in leveled[0]] == ["Linha número 0", "12,5"]
