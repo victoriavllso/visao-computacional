@@ -35,6 +35,7 @@ sys.path.append(str(ROOT / "src"))
 sys.path.append(str(ROOT / "web"))
 
 import pandas as pd
+from tqdm import tqdm
 
 from app import pipeline
 from labeling.labels import load_labels, truth_facts
@@ -169,7 +170,8 @@ def main():
 
     start = time.perf_counter()
     with ProcessPoolExecutor(args.workers) as pool:
-        results = pd.DataFrame(pool.map(evaluate_product, tasks, chunksize=2))
+        mapped = pool.map(evaluate_product, tasks, chunksize=2)
+        results = pd.DataFrame(list(tqdm(mapped, total=len(tasks), unit="product")))
     elapsed = time.perf_counter() - start
 
     run_name = f"e2e_{args.split}_{datetime.now():%Y%m%d_%H%M%S}_{args.tag}"
