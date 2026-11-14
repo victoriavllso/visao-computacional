@@ -677,7 +677,6 @@
 {"code": "7896004011677", "added_sugars": 32, "saturated_fat": 3.7, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:11:48", "labeler": "hand-labeled"}
 {"code": "7896114100902", "added_sugars": 0, "saturated_fat": 20, "sodium": 510, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:12:44", "labeler": "hand-labeled"}
 {"code": "7896625211395", "added_sugars": 0, "saturated_fat": 5.9, "sodium": 539, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:12:58", "labeler": "hand-labeled"}
-{"code": "7898215152484", "added_sugars": null, "saturated_fat": 0, "sodium": 102, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:13:25", "labeler": "hand-labeled"}
 {"code": "7898644310554", "added_sugars": 24, "saturated_fat": 2.1, "sodium": 41, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:13:41", "labeler": "hand-labeled"}
 {"code": "7898067340404", "added_sugars": 0, "saturated_fat": 5.7, "sodium": 461, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:13:56", "labeler": "hand-labeled"}
 {"code": "7898931157015", "added_sugars": 21, "saturated_fat": 3.1, "sodium": 56, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:14:06", "labeler": "hand-labeled"}
@@ -701,14 +700,12 @@
 {"code": "7896775179675", "added_sugars": 13, "saturated_fat": 3, "sodium": 17, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:18:55", "labeler": "hand-labeled"}
 {"code": "7898971538010", "added_sugars": null, "saturated_fat": 2.6, "sodium": 273, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:19:18", "labeler": "hand-labeled"}
 {"code": "7898637353506", "added_sugars": 0, "saturated_fat": 1.5, "sodium": 349, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:19:39", "labeler": "hand-labeled"}
-{"code": "7898026490706", "added_sugars": null, "saturated_fat": 0, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:20:01", "labeler": "hand-labeled"}
 {"code": "7898786020069", "added_sugars": 0, "saturated_fat": 0.8, "sodium": 47, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:20:23", "labeler": "hand-labeled"}
 {"code": "7898215151708", "added_sugars": 0, "saturated_fat": 1.9, "sodium": 61, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:20:40", "labeler": "hand-labeled"}
 {"code": "7897163401118", "added_sugars": 40, "saturated_fat": 0.1, "sodium": 185, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:20:54", "labeler": "hand-labeled"}
 {"code": "7896256603446", "added_sugars": 0, "saturated_fat": 0.7, "sodium": 68, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:21:06", "labeler": "hand-labeled"}
 {"code": "7896991770502", "added_sugars": 0, "saturated_fat": 1.2, "sodium": 63.5, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:21:20", "labeler": "hand-labeled"}
 {"code": "7896089012637", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:21:33", "labeler": "hand-labeled"}
-{"code": "7898904736841", "added_sugars": null, "saturated_fat": 4, "sodium": 105, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:21:52", "labeler": "hand-labeled"}
 {"code": "7898929046024", "added_sugars": 0, "saturated_fat": 0.6, "sodium": 548, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:22:02", "labeler": "hand-labeled"}
 {"code": "7898596080574", "added_sugars": null, "saturated_fat": 11, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:22:59", "labeler": "hand-labeled"}
 {"code": "7898701300283", "added_sugars": 26, "saturated_fat": 4.9, "sodium": 130, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:23:10", "labeler": "hand-labeled"}
@@ -741,7 +738,6 @@
 {"code": "7898637355234", "added_sugars": 0, "saturated_fat": 0.2, "sodium": 306, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:32:24", "labeler": "hand-labeled"}
 {"code": "7896419438014", "added_sugars": 0, "saturated_fat": 0.4, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:32:33", "labeler": "hand-labeled"}
 {"code": "7897951610395", "added_sugars": 0, "saturated_fat": 12, "sodium": 534, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:32:50", "labeler": "hand-labeled"}
-{"code": "7896714803241", "added_sugars": null, "saturated_fat": 0.3, "sodium": 25, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:33:16", "labeler": "hand-labeled"}
 {"code": "7896194400022", "added_sugars": 0, "saturated_fat": 1.1, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:33:28", "labeler": "hand-labeled"}
 {"code": "7896051130123", "added_sugars": 0, "saturated_fat": 2.3, "sodium": 37, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:33:40", "labeler": "hand-labeled"}
 {"code": "7898116950660", "added_sugars": 0, "saturated_fat": 3, "sodium": 128, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:33:56", "labeler": "hand-labeled"}
@@ -836,7 +832,6 @@
 {"code": "7898300632075", "added_sugars": 0, "saturated_fat": null, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:57:55", "labeler": "hand-labeled"}
 {"code": "7896982140048", "added_sugars": 0, "saturated_fat": 3.3, "sodium": 155, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:58:05", "labeler": "hand-labeled"}
 {"code": "7896280600862", "added_sugars": 4.6, "saturated_fat": 0.8, "sodium": 354, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:58:17", "labeler": "hand-labeled"}
-{"code": "0596013301420", "added_sugars": null, "saturated_fat": null, "sodium": 765, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:58:33", "labeler": "hand-labeled"}
 {"code": "7898568901043", "added_sugars": 0, "saturated_fat": 1, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:58:45", "labeler": "hand-labeled"}
 {"code": "7898970554110", "added_sugars": 18, "saturated_fat": 2.8, "sodium": 269, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:59:06", "labeler": "hand-labeled"}
 {"code": "7894904258550", "added_sugars": 2.3, "saturated_fat": 2.2, "sodium": 571, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T15:59:17", "labeler": "hand-labeled"}
@@ -850,7 +845,6 @@
 {"code": "7896232800876", "added_sugars": 0.5, "saturated_fat": 0.3, "sodium": 4037, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T16:01:15", "labeler": "hand-labeled"}
 {"code": "7898968213012", "added_sugars": 0, "saturated_fat": 0, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T16:01:23", "labeler": "hand-labeled"}
 {"code": "7898130991526", "added_sugars": 0, "saturated_fat": 2.3, "sodium": 36, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T16:01:35", "labeler": "hand-labeled"}
-{"code": "7893500018483", "added_sugars": null, "saturated_fat": 0.2, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-11T16:01:55", "labeler": "hand-labeled"}
 {"code": "7896074606278", "added_sugars": 0, "saturated_fat": 5.5, "sodium": 577, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:14:59", "labeler": "hand-labeled"}
 {"code": "7898205925449", "added_sugars": 0, "saturated_fat": 0, "sodium": 61, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:15:43", "labeler": "hand-labeled"}
 {"code": "7898187730307", "added_sugars": 0, "saturated_fat": 4, "sodium": 125, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:15:51", "labeler": "hand-labeled"}
@@ -873,7 +867,6 @@
 {"code": "0619205390023", "added_sugars": 0, "saturated_fat": 11, "sodium": 139, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:21:26", "labeler": "hand-labeled"}
 {"code": "7892300002791", "added_sugars": 14, "saturated_fat": 2.8, "sodium": 7.5, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:21:36", "labeler": "hand-labeled"}
 {"code": "7896496917716", "added_sugars": 14, "saturated_fat": 3.8, "sodium": 361, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:21:49", "labeler": "hand-labeled"}
-{"code": "7896038350056", "added_sugars": null, "saturated_fat": 0.1, "sodium": 2.5, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:22:04", "labeler": "hand-labeled"}
 {"code": "7898755180121", "added_sugars": 0, "saturated_fat": 4, "sodium": 72, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:22:25", "labeler": "hand-labeled"}
 {"code": "7891823506410", "added_sugars": 41, "saturated_fat": 21, "sodium": 85, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:22:36", "labeler": "hand-labeled"}
 {"code": "7896050201749", "added_sugars": null, "saturated_fat": null, "sodium": 200, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:22:52", "labeler": "hand-labeled"}
@@ -901,12 +894,10 @@
 {"code": "7896004010052", "added_sugars": 36, "saturated_fat": null, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:34:38", "labeler": "hand-labeled"}
 {"code": "7895000515820", "added_sugars": 0, "saturated_fat": 0, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:36:45", "labeler": "hand-labeled"}
 {"code": "7891167022034", "added_sugars": 0.1, "saturated_fat": 0.9, "sodium": 560, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:38:19", "labeler": "hand-labeled"}
-{"code": "7899659901089", "added_sugars": null, "saturated_fat": 0, "sodium": 205, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:39:26", "labeler": "hand-labeled"}
 {"code": "7898944785809", "added_sugars": 6.3, "saturated_fat": null, "sodium": 51, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:40:00", "labeler": "hand-labeled"}
 {"code": "7894900660555", "added_sugars": 0, "saturated_fat": null, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:40:39", "labeler": "hand-labeled"}
 {"code": "7896051166122", "added_sugars": 12, "saturated_fat": 4.7, "sodium": 34, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:41:45", "labeler": "hand-labeled"}
 {"code": "7892840819170", "added_sugars": 6.7, "saturated_fat": 0.2, "sodium": 80, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:42:31", "labeler": "hand-labeled"}
-{"code": "7891103204371", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:42:50", "labeler": "hand-labeled"}
 {"code": "7898364280267", "added_sugars": 41, "saturated_fat": 3, "sodium": 230, "basis": null, "status": "partial", "note": null, "saved_at": "2026-10-12T15:43:52", "labeler": "hand-labeled"}
 {"code": "7891527064674", "added_sugars": null, "saturated_fat": null, "sodium": 36, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:45:43", "labeler": "hand-labeled"}
 {"code": "2525110001719", "added_sugars": 0, "saturated_fat": null, "sodium": 736, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:50:21", "labeler": "hand-labeled"}
@@ -921,7 +912,6 @@
 {"code": "7891962066844", "added_sugars": 27, "saturated_fat": 5, "sodium": 482, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:52:01", "labeler": "hand-labeled"}
 {"code": "7898206356907", "added_sugars": 23, "saturated_fat": 8.8, "sodium": 91, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:52:18", "labeler": "hand-labeled"}
 {"code": "7898918205296", "added_sugars": 19, "saturated_fat": 0, "sodium": 7.9, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:52:28", "labeler": "hand-labeled"}
-{"code": "7896022207571", "added_sugars": null, "saturated_fat": 0.3, "sodium": 5, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:52:39", "labeler": "hand-labeled"}
 {"code": "7891515598259", "added_sugars": 0.6, "saturated_fat": 8.5, "sodium": 1180, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:52:58", "labeler": "hand-labeled"}
 {"code": "7892840802745", "added_sugars": 0, "saturated_fat": null, "sodium": 13, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:53:08", "labeler": "hand-labeled"}
 {"code": "7896094910959", "added_sugars": 0, "saturated_fat": null, "sodium": 1928, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:53:20", "labeler": "hand-labeled"}
@@ -939,20 +929,17 @@
 {"code": "7896336011918", "added_sugars": 40, "saturated_fat": 4.5, "sodium": 178, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:56:02", "labeler": "hand-labeled"}
 {"code": "7891203068965", "added_sugars": 3.5, "saturated_fat": 1.1, "sodium": 319, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-12T15:56:18", "labeler": "hand-labeled"}
 {"code": "7898665434192", "added_sugars": 0, "saturated_fat": 1.5, "sodium": 55, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:46:33", "labeler": "hand-labeled"}
-{"code": "7898373960020", "added_sugars": null, "saturated_fat": null, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:46:56", "labeler": "hand-labeled"}
 {"code": "7622210833389", "added_sugars": 44, "saturated_fat": 14, "sodium": 301, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:47:18", "labeler": "hand-labeled"}
 {"code": "7896292305489", "added_sugars": 27, "saturated_fat": 0, "sodium": 16, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:47:36", "labeler": "hand-labeled"}
 {"code": "7897213319967", "added_sugars": 20, "saturated_fat": 0.5, "sodium": 339, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:47:53", "labeler": "hand-labeled"}
 {"code": "7896986261442", "added_sugars": 41, "saturated_fat": 22, "sodium": 101, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:48:15", "labeler": "hand-labeled"}
 {"code": "7896004007618", "added_sugars": 38, "saturated_fat": 0, "sodium": 282, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:48:27", "labeler": "hand-labeled"}
-{"code": "7898059340405", "added_sugars": null, "saturated_fat": 0, "sodium": 200, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:49:50", "labeler": "hand-labeled"}
 {"code": "7894854600034", "added_sugars": 0.2, "saturated_fat": 0.5, "sodium": 12, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:50:03", "labeler": "hand-labeled"}
 {"code": "7896036000717", "added_sugars": 0.7, "saturated_fat": 0, "sodium": 144, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:50:10", "labeler": "hand-labeled"}
 {"code": "7891962053189", "added_sugars": 2.5, "saturated_fat": 3.5, "sodium": 522, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:50:25", "labeler": "hand-labeled"}
 {"code": "7891515555337", "added_sugars": 0, "saturated_fat": 9, "sodium": 592, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:50:43", "labeler": "hand-labeled"}
 {"code": "7891080007705", "added_sugars": 0, "saturated_fat": 0.2, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:50:52", "labeler": "hand-labeled"}
 {"code": "7897436006828", "added_sugars": 15, "saturated_fat": 7, "sodium": 122, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:51:02", "labeler": "hand-labeled"}
-{"code": "0192505072184", "added_sugars": null, "saturated_fat": 1, "sodium": 42.42, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:51:17", "labeler": "hand-labeled"}
 {"code": "7891167011731", "added_sugars": 0, "saturated_fat": 0.8, "sodium": 593, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:51:49", "labeler": "hand-labeled"}
 {"code": "7891000061367", "added_sugars": 0.7, "saturated_fat": 0.9, "sodium": 105, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:51:58", "labeler": "hand-labeled"}
 {"code": "7622210567567", "added_sugars": 47, "saturated_fat": 15, "sodium": 173, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:52:05", "labeler": "hand-labeled"}
@@ -982,7 +969,6 @@
 {"code": "2221672810256", "added_sugars": 0, "saturated_fat": 1.2, "sodium": 338, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:58:12", "labeler": "hand-labeled"}
 {"code": "7898366930023", "added_sugars": 0, "saturated_fat": 0.4, "sodium": 45, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:58:21", "labeler": "hand-labeled"}
 {"code": "7896181712107", "added_sugars": 0, "saturated_fat": 7.9, "sodium": 73, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:58:34", "labeler": "hand-labeled"}
-{"code": "7898320010129", "added_sugars": null, "saturated_fat": 3.5, "sodium": 147, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:58:47", "labeler": "hand-labeled"}
 {"code": "7894900010398", "added_sugars": 11, "saturated_fat": null, "sodium": 5, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:58:55", "labeler": "hand-labeled"}
 {"code": "7891025124030", "added_sugars": 0, "saturated_fat": 0, "sodium": 47, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:59:08", "labeler": "hand-labeled"}
 {"code": "7896036000724", "added_sugars": 0, "saturated_fat": 0, "sodium": 6, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:59:14", "labeler": "hand-labeled"}
@@ -991,10 +977,8 @@
 {"code": "7898680360209", "added_sugars": 0, "saturated_fat": 3.5, "sodium": 908, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:59:48", "labeler": "hand-labeled"}
 {"code": "7891097013003", "added_sugars": 7.2, "saturated_fat": 0, "sodium": 57, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T13:59:58", "labeler": "hand-labeled"}
 {"code": "7892840817978", "added_sugars": 0, "saturated_fat": 4.8, "sodium": 497, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:00:06", "labeler": "hand-labeled"}
-{"code": "20022120026031109240", "added_sugars": null, "saturated_fat": 0.8, "sodium": 348, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:00:20", "labeler": "hand-labeled"}
 {"code": "0991495154104", "added_sugars": null, "saturated_fat": 0.6, "sodium": 31, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:00:31", "labeler": "hand-labeled"}
 {"code": "7896002360326", "added_sugars": 3.8, "saturated_fat": 0.7, "sodium": 381, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:00:46", "labeler": "hand-labeled"}
-{"code": "7896022200732", "added_sugars": null, "saturated_fat": 0, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:01:00", "labeler": "hand-labeled"}
 {"code": "7896002310246", "added_sugars": 8.4, "saturated_fat": 0.6, "sodium": 265, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:01:17", "labeler": "hand-labeled"}
 {"code": "7899638362245", "added_sugars": 0, "saturated_fat": 9.3, "sodium": 55, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:01:32", "labeler": "hand-labeled"}
 {"code": "7891095028344", "added_sugars": null, "saturated_fat": 1.1, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:01:42", "labeler": "hand-labeled"}
@@ -1033,7 +1017,6 @@
 {"code": "7891000329450", "added_sugars": 20, "saturated_fat": 2.4, "sodium": 273, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:11:32", "labeler": "hand-labeled"}
 {"code": "7896283007262", "added_sugars": 12, "saturated_fat": 3.9, "sodium": 150, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:11:45", "labeler": "hand-labeled"}
 {"code": "0040141589576", "added_sugars": 0, "saturated_fat": 3.5, "sodium": 9.9, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:12:00", "labeler": "hand-labeled"}
-{"code": "7898955997024", "added_sugars": null, "saturated_fat": 1.5, "sodium": 45, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:12:11", "labeler": "hand-labeled"}
 {"code": "7891330019342", "added_sugars": 42, "saturated_fat": 20, "sodium": 79, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:12:19", "labeler": "hand-labeled"}
 {"code": "0074468013902", "added_sugars": 12, "saturated_fat": 3.2, "sodium": 84, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:12:27", "labeler": "hand-labeled"}
 {"code": "7898967660718", "added_sugars": 18, "saturated_fat": 4.4, "sodium": 141, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:12:43", "labeler": "hand-labeled"}
@@ -1041,7 +1024,6 @@
 {"code": "7897213319622", "added_sugars": 30, "saturated_fat": 2.4, "sodium": 284, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:12:59", "labeler": "hand-labeled"}
 {"code": "0609963835904", "added_sugars": 0, "saturated_fat": 2.6, "sodium": 168, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:13:10", "labeler": "hand-labeled"}
 {"code": "7898686950527", "added_sugars": 2, "saturated_fat": 5, "sodium": 596, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:13:26", "labeler": "hand-labeled"}
-{"code": "7890300680322", "added_sugars": null, "saturated_fat": 0, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:13:35", "labeler": "hand-labeled"}
 {"code": "7891122124346", "added_sugars": 0, "saturated_fat": 1.7, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:19:53", "labeler": "hand-labeled"}
 {"code": "7896051166344", "added_sugars": 0, "saturated_fat": 6.2, "sodium": 540, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:20:03", "labeler": "hand-labeled"}
 {"code": "7898206502199", "added_sugars": 4.7, "saturated_fat": null, "sodium": 1.8, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:20:22", "labeler": "hand-labeled"}
@@ -1120,13 +1102,11 @@
 {"code": "7891515496357", "added_sugars": 1.1, "saturated_fat": 2, "sodium": 342, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:38:55", "labeler": "hand-labeled"}
 {"code": "7622210575999", "added_sugars": 39, "saturated_fat": 14, "sodium": 240, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:39:06", "labeler": "hand-labeled"}
 {"code": "7896063200586", "added_sugars": 0, "saturated_fat": 2.7, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:39:12", "labeler": "hand-labeled"}
-{"code": "0749355080137", "added_sugars": null, "saturated_fat": 3, "sodium": 338, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:39:29", "labeler": "hand-labeled"}
 {"code": "7898637355524", "added_sugars": 0, "saturated_fat": 0.4, "sodium": 314, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:39:51", "labeler": "hand-labeled"}
 {"code": "7891203061621", "added_sugars": 9.2, "saturated_fat": 2.2, "sodium": 295, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:40:13", "labeler": "hand-labeled"}
 {"code": "7896183909123", "added_sugars": 0, "saturated_fat": 2, "sodium": 65, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:40:22", "labeler": "hand-labeled"}
 {"code": "7891107101621", "added_sugars": null, "saturated_fat": 15, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:40:39", "labeler": "hand-labeled"}
 {"code": "7891164028695", "added_sugars": 7.4, "saturated_fat": 1.8, "sodium": 44, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:40:47", "labeler": "hand-labeled"}
-{"code": "0745110313410", "added_sugars": null, "saturated_fat": 1, "sodium": null, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:41:00", "labeler": "hand-labeled"}
 {"code": "7898571520156", "added_sugars": 0, "saturated_fat": 3, "sodium": 200, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:41:10", "labeler": "hand-labeled"}
 {"code": "11072216", "added_sugars": 0, "saturated_fat": 1.4, "sodium": 69, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:41:21", "labeler": "hand-labeled"}
 {"code": "7898598750420", "added_sugars": 5.5, "saturated_fat": 0.7, "sodium": 79, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:41:33", "labeler": "hand-labeled"}
@@ -1158,7 +1138,6 @@
 {"code": "7896002304184", "added_sugars": 9, "saturated_fat": 0.6, "sodium": 336, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:47:05", "labeler": "hand-labeled"}
 {"code": "7897261351001", "added_sugars": 14.5, "saturated_fat": 4.8, "sodium": 288, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:47:22", "labeler": "hand-labeled"}
 {"code": "7898911657719", "added_sugars": null, "saturated_fat": 4.8, "sodium": 180, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:47:37", "labeler": "hand-labeled"}
-{"code": "7896216100176", "added_sugars": null, "saturated_fat": 0.7, "sodium": 334, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:47:51", "labeler": "hand-labeled"}
 {"code": "7898915415827", "added_sugars": 0, "saturated_fat": 2.1, "sodium": 126, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:48:05", "labeler": "hand-labeled"}
 {"code": "7895000528776", "added_sugars": 49, "saturated_fat": 5, "sodium": 280, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:48:18", "labeler": "hand-labeled"}
 {"code": "7798304841650", "added_sugars": 20, "saturated_fat": 15, "sodium": 28, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T14:48:40", "labeler": "hand-labeled"}
@@ -1171,7 +1150,6 @@
 {"code": "7892840820626", "added_sugars": 0, "saturated_fat": 4, "sodium": 479, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:12:41", "labeler": "hand-labeled"}
 {"code": "7896058257656", "added_sugars": 30, "saturated_fat": 10, "sodium": 194, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:12:56", "labeler": "hand-labeled"}
 {"code": "7898695690025", "added_sugars": 0, "saturated_fat": 0, "sodium": 317, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:13:08", "labeler": "hand-labeled"}
-{"code": "7891340302618", "added_sugars": null, "saturated_fat": 1.8, "sodium": 31, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:13:32", "labeler": "hand-labeled"}
 {"code": "7891823929318", "added_sugars": 36, "saturated_fat": 26, "sodium": 104, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:13:39", "labeler": "hand-labeled"}
 {"code": "7896275970857", "added_sugars": 50, "saturated_fat": 5.5, "sodium": 150, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:13:47", "labeler": "hand-labeled"}
 {"code": "7892840822286", "added_sugars": 1.5, "saturated_fat": 4.1, "sodium": 598, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:13:54", "labeler": "hand-labeled"}
@@ -1232,7 +1210,6 @@
 {"code": "7897153001588", "added_sugars": 0, "saturated_fat": 52, "sodium": 371, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:26:20", "labeler": "hand-labeled"}
 {"code": "7898061680926", "added_sugars": 0, "saturated_fat": 2.5, "sodium": 512, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:26:28", "labeler": "hand-labeled"}
 {"code": "7898658060025", "added_sugars": 0, "saturated_fat": 9, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:26:35", "labeler": "hand-labeled"}
-{"code": "7896038311194", "added_sugars": null, "saturated_fat": 0.3, "sodium": 4, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:27:13", "labeler": "hand-labeled"}
 {"code": "7898939247039", "added_sugars": 0, "saturated_fat": 0.2, "sodium": 63, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:27:22", "labeler": "hand-labeled"}
 {"code": "7891000248768", "added_sugars": 40, "saturated_fat": 17, "sodium": 89, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:30:42", "labeler": "hand-labeled"}
 {"code": "0609963485468", "added_sugars": 0, "saturated_fat": 0, "sodium": 2, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:30:48", "labeler": "hand-labeled"}
@@ -1246,9 +1223,7 @@
 {"code": "7896903861243", "added_sugars": 9.7, "saturated_fat": 2.1, "sodium": 288, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:32:20", "labeler": "hand-labeled"}
 {"code": "7895000474431", "added_sugars": 0, "saturated_fat": 85, "sodium": 0, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:32:31", "labeler": "hand-labeled"}
 {"code": "7896066303680", "added_sugars": 2.9, "saturated_fat": 0.7, "sodium": 326, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:32:48", "labeler": "hand-labeled"}
-{"code": "7896006798781", "added_sugars": null, "saturated_fat": 0.4, "sodium": 1.3, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:32:54", "labeler": "hand-labeled"}
 {"code": "7891000361214", "added_sugars": 41, "saturated_fat": 20, "sodium": 102, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:33:19", "labeler": "hand-labeled"}
-{"code": "7896434920778", "added_sugars": null, "saturated_fat": 0, "sodium": 22, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:33:33", "labeler": "hand-labeled"}
 {"code": "7895000537488", "added_sugars": 11, "saturated_fat": 4.9, "sodium": 259, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:33:41", "labeler": "hand-labeled"}
 {"code": "7622210674050", "added_sugars": 55, "saturated_fat": 14, "sodium": 81, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:33:48", "labeler": "hand-labeled"}
 {"code": "7898311851410", "added_sugars": 13, "saturated_fat": 3.1, "sodium": 37, "basis": null, "status": "ok", "note": null, "saved_at": "2026-10-15T15:34:10", "labeler": "hand-labeled"}
@@ -1347,3 +1322,28 @@
 {"code": "5601312184850", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "no_table", "note": "strange format", "saved_at": "2026-11-04T11:56:35"}
 {"code": "7899941201811", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-04T11:56:50"}
 {"code": "7896004006833", "added_sugars": 40, "saturated_fat": 0.9, "sodium": 415, "basis": "100g", "status": "ok", "note": "split table in two columns", "saved_at": "2026-11-04T11:57:16"}
+{"code": "7898026490706", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:38:42"}
+{"code": "7891340302618", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:38:51"}
+{"code": "7896006798781", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:38:55"}
+{"code": "7893500018483", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:00"}
+{"code": "7896022200732", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:03"}
+{"code": "7896038311194", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:08"}
+{"code": "7896434920778", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:17"}
+{"code": "7898059340405", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:23"}
+{"code": "0749355080137", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:29"}
+{"code": "0596013301420", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:33"}
+{"code": "7898215152484", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:37"}
+{"code": "7899659901089", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:40"}
+{"code": "0192505072184", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:45"}
+{"code": "7890300680322", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:39:51"}
+{"code": "7898373960020", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": "Texto linear, sem valores por 100g/ml", "saved_at": "2026-11-14T09:40:30"}
+{"code": "7898955997024", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:40:35"}
+{"code": "20022120026031109240", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:40:39"}
+{"code": "7891103204371", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:40:43"}
+{"code": "7896038350056", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:40:56"}
+{"code": "7896022207571", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:41:01"}
+{"code": "7898320010129", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:41:04"}
+{"code": "0745110313410", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:41:11"}
+{"code": "7898904736841", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:41:13"}
+{"code": "7896714803241", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:41:16"}
+{"code": "7896216100176", "added_sugars": null, "saturated_fat": null, "sodium": null, "basis": null, "status": "old_format", "note": null, "saved_at": "2026-11-14T09:41:19"}
