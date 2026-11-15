@@ -3,6 +3,7 @@
 photo ─► locate + straighten table ─► OCR ─► parse rows ─► NutritionFacts
 """
 
+import re
 from dataclasses import astuple, dataclass, field, replace
 from pathlib import Path
 
@@ -93,6 +94,12 @@ FALLBACK_MODEL = "medium"
 # gets the whole crop.
 FALLBACK_ROWS = True
 ROW_STRIP = 1.0
+# A number whose box touches a strip's top or bottom edge (within this many
+# pixels) was cut by it: a fragment of the row above or below, not the
+# label's row (dev: '1,6' g of saturated fat read as '8' from the top of
+# the next row's digits). Dropped; None keeps it. Words with letters stay:
+# a label on slanted text can be as tall as its strip.
+ROW_EDGE = 1
 
 
 @dataclass
@@ -243,8 +250,6 @@ def _read(image, locate, preprocess, debug_dir, cache=None, rotation=0):
     # Cache keys: rotation and classical steps, then the OCR call.
     prefix = f"r{rotation}/{'' if locate else 'nolocate/'}"
     if debug_dir is not None:
-        from pathlib import Path
-
         debug_dir = Path(debug_dir)
         debug_dir.mkdir(parents=True, exist_ok=True)
         from vision.back.debug import save_original
@@ -439,6 +444,7 @@ def _read_rows(cache, context, strips):
                 word.conf,
             )
             for word in _rapidocr(cache, key, strip, not context.straight, model)
+            if ROW_EDGE is None or not _cut(word, strip.shape[0])
         ]
     headers = next(
         (
@@ -452,6 +458,14 @@ def _read_rows(cache, context, strips):
         [],
     )
     return parse_table(words, headers)
+
+
+def _cut(word, height):
+    """A number (no letters) whose box touches the top or bottom edge of a
+    strip this tall."""
+    if re.search(r"[^\W\d_]", word.text):
+        return False
+    return word.y <= ROW_EDGE or word.y + word.h >= height - ROW_EDGE
 
 
 def _missing(reading):

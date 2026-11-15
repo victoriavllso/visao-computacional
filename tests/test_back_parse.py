@@ -567,3 +567,15 @@ def test_missing_rows_are_strips_around_their_labels():
     context.readings = [(reading, 1.0)]
     context.learned = sentence(320, "Não contém quantidades significativas de sódio")
     assert _missing_rows(reading, context) is None
+
+
+def test_words_cut_by_a_strips_edge_are_fragments():
+    from vision.back.pipeline import _cut
+
+    # An 81 px strip: the label in the middle; '8' cut at the top.
+    assert not _cut(Word("Saturadas", 178, 15, 194, 51), 81)
+    assert _cut(Word("8", 932, 0, 35, 34), 81)
+    assert _cut(Word("0,5", 932, 50, 35, 31), 81)
+    assert not _cut(Word("0,5", 932, 20, 35, 31), 81)
+    # Labels stay even when as tall as the strip (slanted text).
+    assert not _cut(Word("Açúcares adicionados (g)", 0, 0, 300, 81), 81)
