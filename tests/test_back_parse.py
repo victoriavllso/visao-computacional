@@ -524,3 +524,46 @@ def test_part_larger_than_its_total_otherwise():
         *table_row(40, "Gorduras saturadas (g)", "8,4", "2,5"),
     ]
     assert parse_table(words).facts.saturated_fat_g == 8.4
+
+
+def test_headers_from_another_reading_give_the_column():
+    # A strip of one row, read again without the header row: the headers
+    # read on the whole table place the '100 g' column.
+    header = parse_table(row(0, (300, "100"), (340, "g"), (420, "60"), (450, "g")))
+    strip = row(40, (0, "Sódio"), (60, "(mg)"), (200, "5"), (300, "579"), (420, "347"))
+
+    assert parse_table(strip).facts.sodium_mg == 5
+    assert parse_table(strip, header.headers).facts.sodium_mg == 579
+
+
+def test_missing_rows_are_strips_around_their_labels():
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    from vision.back.pipeline import _missing_rows
+
+    # Sodium's values unread; its label (y 280, 20 tall) is on the table.
+    words = [w for w in NESCAU if not (w.y == 280 and w.x >= 300)]
+    reading = parse_table(words)
+    crop = np.zeros((400, 600, 3), np.uint8)
+    context = SimpleNamespace(
+        crop=crop, words=words, learned=[], readings=[(reading, 1.0)]
+    )
+    assert reading.facts.sodium_mg is None
+    assert _missing_rows(reading, context) == [(270, 311)]
+
+    # Found only by Tesseract, on an image scaled 2x: back to crop pixels.
+    scaled = [replace(w, x=2 * w.x, y=2 * w.y, w=2 * w.w, h=2 * w.h) for w in words]
+    context.readings = [(parse_table([]), 1.0), (parse_table(scaled), 2.0)]
+    assert _missing_rows(reading, context) == [(270, 311)]
+
+    # A missing nutrient whose label no engine found: the whole crop.
+    context.readings = [(parse_table([]), 1.0)]
+    assert _missing_rows(reading, context) is None
+
+    # The value may be declared in the 'não contém' sentence: the whole crop.
+    context.readings = [(reading, 1.0)]
+    context.learned = sentence(320, "Não contém quantidades significativas de sódio")
+    assert _missing_rows(reading, context) is None

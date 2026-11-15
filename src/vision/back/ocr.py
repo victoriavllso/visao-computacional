@@ -172,27 +172,39 @@ def _limit_onnx_threads():
     onnxruntime.SessionOptions = session_options
 
 
+# RapidOCR shrinks images to this many pixels on the long side (its
+# Global.max_side_len), then its detector enlarges them to at least
+# 736 px on the short side (Det.limit_side_len, limit_type "min").
+RAPIDOCR_MAX_SIDE = 2000
+# "<model>_native": the same models, the detector without that enlargement.
+# For strips of a few rows, already at the scale their whole crop is read
+# at: enlarged to 736 px, a 300 px strip took longer to detect than the
+# whole crop (dev, medium: 7.4 s vs 5.3 s).
+NATIVE = "_native"
+
+
 def _engine(model):
     """PP-OCRv6 detection and recognition models: "small" (RapidOCR's
     default) or "medium" (~4.7x slower per call on one thread, 12 dev
-    crops)."""
+    crops), each optionally NATIVE."""
     if model not in _rapidocr:
         _limit_onnx_threads()
         import logging
 
         from rapidocr import ModelType, RapidOCR
 
-        if model == "small":
-            engine = RapidOCR()
-        elif model == "medium":
-            engine = RapidOCR(
-                params={
-                    "Det.model_type": ModelType.MEDIUM,
-                    "Rec.model_type": ModelType.MEDIUM,
-                }
-            )
-        else:
+        size = model.removesuffix(NATIVE)
+        params = {}
+        if size == "medium":
+            params = {
+                "Det.model_type": ModelType.MEDIUM,
+                "Rec.model_type": ModelType.MEDIUM,
+            }
+        elif size != "small":
             raise ValueError(f"unknown RapidOCR model: {model}")
+        if model.endswith(NATIVE):
+            params |= {"Det.limit_side_len": 32, "Det.limit_type": "min"}
+        engine = RapidOCR(params=params) if params else RapidOCR()
         _rapidocr[model] = engine
 
         # Set RapidOCR's logger to ERROR level to avoid excessive logging output

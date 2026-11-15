@@ -210,6 +210,18 @@ photo ─► locate ─► almost no text? ────────────�
 - **Refine**: when a label is found without a value, re-read just that row's value region as a single text line.
 - **Learned OCR, combined** (`pipeline.ENGINE = "combined"`, default): RapidOCR (PaddleOCR models on ONNX Runtime, CPU) reads the located and dewarped **color** crop; each nutrient takes RapidOCR's value, or Tesseract's where RapidOCR has none. RapidOCR is more accurate when it reads a value, but its text detector misses isolated small cells such as a lone `0`, which Tesseract reads. Classical binarization helps Tesseract but makes RapidOCR worse (it is trained on photos), so each engine gets its own input.
 - **Larger model for what is still unread** (`pipeline.FALLBACK_MODEL = "medium"`): when a readable table still has a value unread after RapidOCR's small models and Tesseract, RapidOCR with PP-OCRv6's medium models reads the same crop and fills only the missing values (on 19% of dev photos; ~4.7× slower per call than the small models). Medium alone instead of small is no better (dev 90.2% vs 90.6%: they fail on different photos), as a fallback +9 products, none broken.
+- **Fallbacks cost only where needed** (2026-11-15). The fallbacks (the medium model, the whole photo) made a dev run ~1.7× slower than without them, almost all of it in a few photos. Two changes, each measured with no OCR cache on all 946 dev products (8 workers):
+  - `pipeline.FALLBACKS_AFTER_TURN`: on a photo OSD suggests turning, the turn is chosen on the first readings and only the orientation kept gets the fallbacks; orientations that tie before them still let them decide. Before, every orientation tried ran them, up to three medium-model calls per photo.
+  - `pipeline.FALLBACK_ROWS`: the medium model reads only a strip around each row still missing a value, not the whole crop. Each strip is scaled as RapidOCR scales the whole crop, and the detector doesn't enlarge it to 736 px on the short side (`ocr.NATIVE`): enlarged, a 300 px strip took longer to detect than the whole crop. The whole crop is still read when a missing label wasn't found, or when the "não contém quantidades significativas" sentence is on the photo (a strip doesn't hold it whole).
+
+  | | Before | + fallbacks after the turn | + rows only |
+  | :--- | ---: | ---: | ---: |
+  | Wall time, dev (946 products) | 1439 s | 1303 s | **1248 s** (−13%) |
+  | Slowest product | 124 s | 83 s | 88 s |
+  | E2E same verdict (493) | 80.7% | 80.7% | 80.7% |
+  | Back, all three right (726) | 90.36% | 90.36% | 90.36% |
+
+  Values changed by both, against before: 2 right values lost (saturated fat 0 on a turned photo; a saturated fat of 8 read from a fragment at a strip's edge, truth 1.6), 1 right value gained, 1 wrong value now unknown, 2 values gained on products whose label leaves them blank.
 - **"Não contém quantidades significativas de …"**: nutrients listed in this sentence (RDC 429/2020 simplified tables) count as 0. Found by *signific* (often cut), with up to 250 characters of list after it (a simplified table lists up to nine nutrients, sodium last).
 
 **Evaluation** against the ground truth (hand labels where they exist, see [LABELING.md](LABELING.md); Open Food Facts values otherwise):

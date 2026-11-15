@@ -518,7 +518,9 @@ def bounded(value, bound):
     return None, ""
 
 
-def parse_table(words) -> Reading:
+def parse_table(words, headers=()) -> Reading:
+    """`headers`: '100 g' / '100 ml' headers read elsewhere on the same
+    image, used when `words` (a strip of a few rows) have none."""
     # Rows are grouped on whole OCR boxes, then each box is split in place:
     # splitting first interleaves the tokens of two boxes grouped into one
     # row ('Fibras alimentares (g)' over 'Sódio (mg)' read as 'Fibras Sódio
@@ -532,7 +534,7 @@ def parse_table(words) -> Reading:
         ]
         for row in group_rows(words)
     ]
-    headers = find_headers(rows)
+    headers = find_headers(rows) or list(headers)
     values, matches, labels, spans, value_rows, sources = {}, {}, set(), {}, {}, {}
     # The sentence mentions the labels; it isn't a table row.
     table_rows = [row for row in rows if NOT_SIGNIFICANT not in row_text(row)]
