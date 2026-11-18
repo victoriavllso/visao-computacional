@@ -287,15 +287,18 @@ Val is about 6 points below dev: the decisions made on dev errors fit dev better
 
 ### Results on hand-labeled dev photos (unmasked)
 
-929 dev photos labeled by hand (837 tables, 27 linear, 15 old format, 50 without a readable table), same snapshot and environment as val:
+All 946 dev photos labeled by hand (818 tables, 28 linear, 51 old format, 49 without a readable table), same snapshot and environment as val. The 2026-11-18 run (`pixi run eval --split dev --hand-only`, no OCR cache) has this branch's changes (medium-model fallback, parser rules, faster fallbacks) **and** corrected labels: wrong values fixed, photos labeled "no table" re-checked, a few old-format tables labeled as new found in the error analysis ([ERROR_ANALYSIS.md](ERROR_ANALYSIS.md)). The two columns don't isolate the code's gain.
 
-| | Value |
-| :--- | ---: |
-| Photo type accuracy | 87.0% |
-| Readable tables wrongly rejected (no answer) | 52 of 837 |
-| Old-format labels wrongly checked as tables | 4 of 15 |
-| Readable photos with all three warning decisions right | **77.4%** |
-| Decision right: added sugars / saturated fat / sodium | 88.2% / 84.1% / 80.4% |
+| | 2026-11-12 (929 labels) | **2026-11-18** (946 labels) |
+| :--- | ---: | ---: |
+| Photo type accuracy | 87.0% | **90.7%** |
+| Readable tables wrongly rejected (no answer) | 52 of 837 | **10 of 818** |
+| Old-format labels wrongly checked as tables | 4 of 15 | 9 of 51 |
+| Readable photos with all three warning decisions right | 77.4% | **92.4%** |
+| Decision right: added sugars / saturated fat / sodium | 88.2% / 84.1% / 80.4% | **96.3% / 96.3% / 94.4%** |
+| Basis (100 g / 100 ml) read right | | 96.7% |
+
+Linear text is still rarely recognized as such (1 of 28; 26 are read as tables, which is how their values get read anyway).
 
 Photos with no format evidence even after both OCR engines are treated as old format (abstain).
 
@@ -460,18 +463,20 @@ Tried and dropped:
 
 The app (`web/`, see its README) runs the back pipeline, the rules and the front pipeline (YOLO + OCR) on a pair of photos and gives a verdict: compliant, inconclusive or non-compliant. `pixi run eval-e2e --split dev` compares that verdict with the one the hand labels of both sides give (same rules, same `summarize()`), on every product with both sides labeled.
 
-Dev, 494 products (2026-11-12, server, 32 workers; history of the changes below):
+Dev, 493 products (2026-11-18, local, 8 workers, no OCR cache, 680 s; this branch's code and corrected labels, see above):
 
 | Labels \ App | compliant | inconclusive | non-compliant |
 | :--- | ---: | ---: | ---: |
-| **compliant** (309) | **244** | 58 | 7 |
-| **inconclusive** (126) | 53 | **66** | 7 |
-| **non-compliant** (59) | 3 | 9 | **47** |
+| **compliant** (339) | **309** | 25 | 5 |
+| **inconclusive** (100) | 44 | **49** | 7 |
+| **non-compliant** (54) | 2 | 2 | **50** |
 
-- Same verdict as the labels: **72.3%**; when the app decides (not inconclusive, 361 products): **80.6%**.
-- Violations: 47 of 59 caught (79.7%), only 3 called compliant.
-- False accusations: 7 of 309 compliant products (2.3%) called non-compliant; of the app's 61 "non-compliant" answers, 47 are right (77%).
-- Truly inconclusive products (old-format tables, values nobody could read) called compliant: 51 of 126, the old-format detection weakness of the back pipeline.
+- Same verdict as the labels: **82.8%** (2026-11-12: 72.3%); when the app decides (not inconclusive, 417 products): **86.1%** (80.6%).
+- Violations: 50 of 54 caught (92.6%), 2 called compliant.
+- False accusations: 5 of 339 compliant products (1.5%) called non-compliant; of the app's 62 "non-compliant" answers, 50 are right (81%).
+- Truly inconclusive products called compliant: 44 of 100. 34 are hand labels with values but no basis (25) or a blank value (10): the label can't decide while the app reads the table. 10 are photos labeled "no table" (7) or old format (3) that the app read as a table. [ERROR_ANALYSIS.md](ERROR_ANALYSIS.md) explains each false positive and negative of 2026-11-15.
+
+The history below was measured on 2026-11-12's code and labels.
 
 **The false accusations come from the back.** Of the first run's 21, 20 were back misreadings (the front warnings were read right) and 1 a missed front warning. Their causes: values from the wrong column or row (%VD or per portion, ~9), physically impossible values (477 g of saturated fat per 100 g, 411,415 mg of sodium, ~6), thousands read as decimals ("1.180 mg" as 1.18, 2), values not read (~3). Two parser fixes, measured on dev:
 
