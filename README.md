@@ -205,16 +205,42 @@ photo ─► locate ─► almost no text? ────────────�
 
 - **Locate** (classical): estimate the text height, keep the ruled lines with morphological opening (kernels of 8× / 4× the text height, so any resolution works), take the connected group of lines with the most line pixels, deskew from the angle of the horizontal lines (Hough), and **dewarp** curved/creased tables: fit a cubic to each horizontal ruled line and remap so the lines become straight (text-line dewarping, applied to ruled lines). Tables with light text on a dark background are inverted.
 - **OCR**: scale the text to ~30 px, adaptive binarization, erase the ruled lines, Tesseract `--psm 11` in Portuguese, with a timeout for pathological images.
-- **Parse**: match each row on its distinctive word (*adicionados* / *adic*, *saturadas*, *sódio*) with fuzzy matching, take the number aligned with the `100 g` header when it is read, else the first number to the right of the label (the 100 g/ml column comes first). Tolerates OCR errors such as `(g)` read as `(9)`; handles side-by-side and linear-text layouts.
+- **Parse**: match each row on its distinctive word (*adicionados* / *adic*, *saturadas*, *sódio*) with fuzzy matching, take the number aligned with the `100 g` header when it is read, else the first number to the right of the label (the 100 g/ml column comes first). Tolerates OCR errors such as `(g)` read as `(9)`; handles side-by-side and linear-text layouts. In linear text, a label ending its line takes the first number of the next line when the nutrient's unit is written with it (`..., Açúcares adicionados` / `46 g (21 g, 42%) ...`); a value glued to its label is split off (`AçúcaresadicionadosOg`); `06` is read as 0.6 (integers have no leading zero).
+- **Parts within their totals**: the total fat, total sugars and carbohydrates rows are read too. A whole-number saturated fat above the total fat, or added sugars above the total sugars (else the carbohydrates), lost its decimal comma: a tenth of it if that fits (`47` under 13 g of fat → 4.7), unknown otherwise. A value with decimals is kept (the total may be the misreading).
 - **Refine**: when a label is found without a value, re-read just that row's value region as a single text line.
 - **Learned OCR, combined** (`pipeline.ENGINE = "combined"`, default): RapidOCR (PaddleOCR models on ONNX Runtime, CPU) reads the located and dewarped **color** crop; each nutrient takes RapidOCR's value, or Tesseract's where RapidOCR has none. RapidOCR is more accurate when it reads a value, but its text detector misses isolated small cells such as a lone `0`, which Tesseract reads. Classical binarization helps Tesseract but makes RapidOCR worse (it is trained on photos), so each engine gets its own input.
-- **"Não contém quantidades significativas de …"**: nutrients listed in this sentence (RDC 429/2020 simplified tables) count as 0.
+- **Larger model for what is still unread** (`pipeline.FALLBACK_MODEL = "medium"`): when a readable table still has a value unread after RapidOCR's small models and Tesseract, RapidOCR with PP-OCRv6's medium models reads the same crop and fills only the missing values (on 19% of dev photos; ~4.7× slower per call than the small models). Medium alone instead of small is no better (dev 90.2% vs 90.6%: they fail on different photos), as a fallback +9 products, none broken.
+- **Fallbacks cost only where needed** (2026-11-15). The fallbacks (the medium model, the whole photo) made a dev run ~1.7× slower than without them, almost all of it in a few photos. Three changes, each measured with no OCR cache on all 946 dev products (8 workers):
+  - `pipeline.FALLBACKS_AFTER_TURN`: on a photo OSD suggests turning, the turn is chosen on the first readings and only the orientation kept gets the fallbacks; orientations that tie before them still let them decide. Before, every orientation tried ran them, up to three medium-model calls per photo.
+  - `pipeline.FALLBACK_ROWS`: the medium model reads only a strip around each row still missing a value, not the whole crop. Each strip is scaled as RapidOCR scales the whole crop, and the detector doesn't enlarge it to 736 px on the short side (`ocr.NATIVE`): enlarged, a 300 px strip took longer to detect than the whole crop. The whole crop is still read when a missing label wasn't found, or when the "não contém quantidades significativas" sentence is on the photo (a strip doesn't hold it whole).
+  - `pipeline.ROW_EDGE`: a number touching a strip's top or bottom edge was cut from the neighboring row, and is dropped (words with letters stay: a label on slanted text can be as tall as its strip). On dev, a saturated fat of 1.6 g was read as `8` from such a fragment. Taller strips (`ROW_STRIP` 1.5 instead of 1.0) were tried and were worse: 2 right values lost instead of 1.
+
+  | | Before | + fallbacks after the turn | + rows only | + edge guard |
+  | :--- | ---: | ---: | ---: | ---: |
+  | Wall time, dev (946 products) | 1439 s | 1303 s | 1248 s | 1306 s |
+  | Slowest product | 124 s | 83 s | 88 s | 99 s |
+  | E2E same verdict (493) | 80.7% | 80.7% | 80.7% | 80.5% |
+  | E2E right when deciding | 84.0% | 84.0% | 84.0% | **84.2%** |
+  | Back, all three right (726) | 90.36% | 90.36% | 90.36% | 90.22% |
+
+  The guard adds 3 OCR calls in 3288: its run being slower than the one before it shows the run-to-run noise on the same machine (±4%). Against before, all three together are 9–13% faster. Values changed: 2 wrong values now unknown (a sodium of 0 for 736, which made a true violation compliant; a sodium of 3 for 67), 1 right value gained (saturated fat 0), 2 right values lost (saturated fat 0 on a turned photo; a sodium of 329 whose numbers sit above their label, cut by the strip), 1 value gained on a product whose label leaves it blank, and 2 turned photos read at another angle with the same values.
+- **"Não contém quantidades significativas de …"**: nutrients listed in this sentence (RDC 429/2020 simplified tables) count as 0. Found by *signific* (often cut), with up to 250 characters of list after it (a simplified table lists up to nine nutrients, sodium last).
 
 **Evaluation** against the ground truth (hand labels where they exist, see [LABELING.md](LABELING.md); Open Food Facts values otherwise):
 
 ```bash
-pixi run eval --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug]
+pixi run eval --split dev [--hand-only] [--limit N] [--no-locate] [--no-preprocess] [--tag name] [--debug] [--ocr-cache] [--rapidocr-model small|medium]
 ```
+
+`--ocr-cache` stores every OCR result (Tesseract words, RapidOCR lines with their four-corner boxes, Tesseract OSD) in `data/cache/back_ocr/<code>.json` and reuses it on later runs (`vision/back/cache.py`). A change to the rules after the OCR (parse, classify, combine, orientation choice) is then scored on the same reading without running the OCR again: on 50 dev products, 3 s instead of 113 s, with identical results. Bump `cache.VERSION` after changing anything before the OCR (locate, dewarp, preprocessing). Building the cache on the server and copying it here lets rule changes be measured on the whole dev set locally:
+
+```bash
+pixi run eval --split dev --hand-only --workers 32 --ocr-cache   # on the server
+tar czf back_ocr_cache.tar.gz -C data/cache back_ocr             # bring this file back
+tar xzf back_ocr_cache.tar.gz -C data/cache                      # locally
+```
+
+`--rapidocr-model medium` uses PP-OCRv6's medium detection and recognition models instead of the small ones (about 4.7× slower per RapidOCR call); its cache entries are kept apart from the small model's.
 
 Results are saved to `data/evaluation/back_<split>_<timestamp>_<tag>/` (CSV + Markdown report). Symlinks in `data/evaluation/latest/` (`back_dev.csv`, `back_val.csv` and `.md` reports) always point to the most recent run for each split. Other tools (labeling server, confusion matrix) read from `latest/` by default; pass an explicit path to use a specific run.
 
@@ -261,15 +287,18 @@ Val is about 6 points below dev: the decisions made on dev errors fit dev better
 
 ### Results on hand-labeled dev photos (unmasked)
 
-929 dev photos labeled by hand (837 tables, 27 linear, 15 old format, 50 without a readable table), same snapshot and environment as val:
+All 946 dev photos labeled by hand (818 tables, 28 linear, 51 old format, 49 without a readable table), same snapshot and environment as val. The 2026-11-18 run (`pixi run eval --split dev --hand-only`, no OCR cache) has this branch's changes (medium-model fallback, parser rules, faster fallbacks) **and** corrected labels: wrong values fixed, photos labeled "no table" re-checked, a few old-format tables labeled as new found in the error analysis ([ERROR_ANALYSIS.md](ERROR_ANALYSIS.md)). The two columns don't isolate the code's gain.
 
-| | Value |
-| :--- | ---: |
-| Photo type accuracy | 87.0% |
-| Readable tables wrongly rejected (no answer) | 52 of 837 |
-| Old-format labels wrongly checked as tables | 4 of 15 |
-| Readable photos with all three warning decisions right | **77.4%** |
-| Decision right: added sugars / saturated fat / sodium | 88.2% / 84.1% / 80.4% |
+| | 2026-11-12 (929 labels) | **2026-11-18** (946 labels) |
+| :--- | ---: | ---: |
+| Photo type accuracy | 87.0% | **90.7%** |
+| Readable tables wrongly rejected (no answer) | 52 of 837 | **10 of 818** |
+| Old-format labels wrongly checked as tables | 4 of 15 | 9 of 51 |
+| Readable photos with all three warning decisions right | 77.4% | **92.4%** |
+| Decision right: added sugars / saturated fat / sodium | 88.2% / 84.1% / 80.4% | **96.3% / 96.3% / 94.4%** |
+| Basis (100 g / 100 ml) read right | | 96.7% |
+
+Linear text is still rarely recognized as such (1 of 28; 26 are read as tables, which is how their values get read anyway).
 
 Photos with no format evidence even after both OCR engines are treated as old format (abstain).
 
@@ -434,18 +463,20 @@ Tried and dropped:
 
 The app (`web/`, see its README) runs the back pipeline, the rules and the front pipeline (YOLO + OCR) on a pair of photos and gives a verdict: compliant, inconclusive or non-compliant. `pixi run eval-e2e --split dev` compares that verdict with the one the hand labels of both sides give (same rules, same `summarize()`), on every product with both sides labeled.
 
-Dev, 494 products (2026-11-12, server, 32 workers; history of the changes below):
+Dev, 493 products (2026-11-18, local, 8 workers, no OCR cache, 680 s; this branch's code and corrected labels, see above):
 
 | Labels \ App | compliant | inconclusive | non-compliant |
 | :--- | ---: | ---: | ---: |
-| **compliant** (309) | **244** | 58 | 7 |
-| **inconclusive** (126) | 53 | **66** | 7 |
-| **non-compliant** (59) | 3 | 9 | **47** |
+| **compliant** (339) | **309** | 25 | 5 |
+| **inconclusive** (100) | 44 | **49** | 7 |
+| **non-compliant** (54) | 2 | 2 | **50** |
 
-- Same verdict as the labels: **72.3%**; when the app decides (not inconclusive, 361 products): **80.6%**.
-- Violations: 47 of 59 caught (79.7%), only 3 called compliant.
-- False accusations: 7 of 309 compliant products (2.3%) called non-compliant; of the app's 61 "non-compliant" answers, 47 are right (77%).
-- Truly inconclusive products (old-format tables, values nobody could read) called compliant: 51 of 126, the old-format detection weakness of the back pipeline.
+- Same verdict as the labels: **82.8%** (2026-11-12: 72.3%); when the app decides (not inconclusive, 417 products): **86.1%** (80.6%).
+- Violations: 50 of 54 caught (92.6%), 2 called compliant.
+- False accusations: 5 of 339 compliant products (1.5%) called non-compliant; of the app's 62 "non-compliant" answers, 50 are right (81%).
+- Truly inconclusive products called compliant: 44 of 100. 34 are hand labels with values but no basis (25) or a blank value (10): the label can't decide while the app reads the table. 10 are photos labeled "no table" (7) or old format (3) that the app read as a table. [ERROR_ANALYSIS.md](ERROR_ANALYSIS.md) explains each false positive and negative of 2026-11-15.
+
+The history below was measured on 2026-11-12's code and labels.
 
 **The false accusations come from the back.** Of the first run's 21, 20 were back misreadings (the front warnings were read right) and 1 a missed front warning. Their causes: values from the wrong column or row (%VD or per portion, ~9), physically impossible values (477 g of saturated fat per 100 g, 411,415 mg of sodium, ~6), thousands read as decimals ("1.180 mg" as 1.18, 2), values not read (~3). Two parser fixes, measured on dev:
 

@@ -1,6 +1,6 @@
 import pytest
 
-from rules.anvisa import Basis
+from rules.anvisa import Basis, Nutrient
 from vision.back.parse import Word, group_rows, parse_number, parse_table
 
 
@@ -159,6 +159,11 @@ def test_rows_group_despite_small_vertical_offsets():
         ("12.000", 12000),
         ("0.500", 0.5),
         ("1.5", 1.5),
+        # A lost decimal comma: integers have no leading zero.
+        ("06", 0.6),
+        ("012g", 0.12),
+        ("00", 0.0),
+        ("0", 0),
     ],
 )
 def test_parse_number(text, expected):
@@ -421,3 +426,156 @@ def test_combine_names_the_engine_of_each_value():
     assert sources[Nutrient.SODIUM] == "rapidocr:first_right"
     assert sources[Nutrient.SATURATED_FAT] == "tesseract:first_right"
     assert Nutrient.ADDED_SUGARS not in sources
+
+
+def test_linear_value_on_the_next_line():
+    # The label ends a line of running text; its value starts the next one.
+    words = [
+        *sentence(
+            0,
+            "64g (29 g, 10%), dos quais Açúcares totais 55 g (25 g), Açúcares adicionados",
+        ),
+        *sentence(40, "46g (21 g, 42%) Proteínas 4,5 g (2 g, 4%) Gorduras totais 26 g"),
+        *sentence(80, "(12 g, 18%), das quais Gorduras saturadas"),
+        *sentence(120, "15 g (6,7 g, 34%), Gorduras trans 0 g (0 g, 0%) Sódio 157 mg"),
+    ]
+    reading = parse_table(words)
+
+    assert reading.facts.added_sugars_g == 46
+    assert reading.facts.saturated_fat_g == 15
+    assert reading.facts.sodium_mg == 157
+    assert reading.sources[Nutrient.ADDED_SUGARS] == "next_line"
+
+
+def test_next_line_needs_the_nutrients_unit():
+    # The net weight under an 'ALTO EM SÓDIO' panel isn't sodium.
+    words = [*sentence(0, "ALTO EM GORDURA SATURADA SÓDIO"), *sentence(40, "180 g")]
+    assert parse_table(words).facts.sodium_mg is None
+    # A table row read backwards (photo turned the wrong way): no unit.
+    words = [
+        *sentence(0, "18 9,1 30 Açúcares adicionados (g)"),
+        *sentence(40, "9,2 31 Açúcares totais (g)"),
+    ]
+    assert parse_table(words).facts.added_sugars_g is None
+
+
+def test_value_glued_to_the_label():
+    words = [
+        Word("AçúcaresadicionadosOg", 0, 0, 210, 20),
+        Word("(0g,0%)", 220, 0, 70, 20),
+        Word("GordurassaturadasOg", 0, 40, 190, 20),
+        Word("Sódio14mg", 0, 80, 90, 20),
+    ]
+    facts = parse_table(words).facts
+
+    assert (facts.added_sugars_g, facts.saturated_fat_g, facts.sodium_mg) == (0, 0, 14)
+
+
+def test_not_significant_long_list_and_cut_word():
+    # The list of a simplified table is long; sodium comes last.
+    words = sentence(
+        0,
+        "Não contém quantidades significativas de carboidratos, açúcares totais,"
+        " açúcares adicionados, proteínas, gorduras totais, gorduras saturadas,"
+        " gorduras trans, fibras alimentares e sódio.",
+    )
+    assert parse_table(words).facts.sodium_mg == 0
+    # 'significativas' cut by the OCR.
+    words = sentence(0, "Não contém quantidades signific adicionados e sódio")
+    facts = parse_table(words).facts
+    assert (facts.added_sugars_g, facts.sodium_mg) == (0, 0)
+
+
+def table_row(y, label, *values):
+    """A table row: the label's words, then its values in columns."""
+    words = label.split()
+    return row(
+        y,
+        *[(90 * i, w) for i, w in enumerate(words)],
+        *[(400 + 100 * i, v) for i, v in enumerate(values)],
+    )
+
+
+def test_part_larger_than_its_total_lost_its_decimal_comma():
+    words = [
+        *table_row(0, "Gorduras totais (g)", "13", "4"),
+        *table_row(40, "Gorduras saturadas (g)", "47", "1,4"),
+        *table_row(80, "Açúcares totais (g)", "15", "4,5"),
+        *table_row(120, "Açúcares adicionados (g)", "60", "18"),
+    ]
+    reading = parse_table(words)
+
+    assert reading.facts.saturated_fat_g == 4.7
+    assert reading.facts.added_sugars_g == 6
+    assert reading.sources[Nutrient.SATURATED_FAT] == "first_right/10"
+    assert reading.totals == {"total_fat": 13, "total_sugars": 15}
+
+
+def test_part_larger_than_its_total_otherwise():
+    # Too large even divided: unknown.
+    words = [
+        *table_row(0, "Gorduras totais (g)", "1", "0,3"),
+        *table_row(40, "Gorduras saturadas (g)", "47", "1,4"),
+    ]
+    assert parse_table(words).facts.saturated_fat_g is None
+    # A value with decimals kept its comma: the total may be the misreading.
+    words = [
+        *table_row(0, "Gorduras totais (g)", "7", "2"),
+        *table_row(40, "Gorduras saturadas (g)", "8,4", "2,5"),
+    ]
+    assert parse_table(words).facts.saturated_fat_g == 8.4
+
+
+def test_headers_from_another_reading_give_the_column():
+    # A strip of one row, read again without the header row: the headers
+    # read on the whole table place the '100 g' column.
+    header = parse_table(row(0, (300, "100"), (340, "g"), (420, "60"), (450, "g")))
+    strip = row(40, (0, "Sódio"), (60, "(mg)"), (200, "5"), (300, "579"), (420, "347"))
+
+    assert parse_table(strip).facts.sodium_mg == 5
+    assert parse_table(strip, header.headers).facts.sodium_mg == 579
+
+
+def test_missing_rows_are_strips_around_their_labels():
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    from vision.back.pipeline import _missing_rows
+
+    # Sodium's values unread; its label (y 280, 20 tall) is on the table.
+    words = [w for w in NESCAU if not (w.y == 280 and w.x >= 300)]
+    reading = parse_table(words)
+    crop = np.zeros((400, 600, 3), np.uint8)
+    context = SimpleNamespace(
+        crop=crop, words=words, learned=[], readings=[(reading, 1.0)]
+    )
+    assert reading.facts.sodium_mg is None
+    assert _missing_rows(reading, context) == [(270, 311)]
+
+    # Found only by Tesseract, on an image scaled 2x: back to crop pixels.
+    scaled = [replace(w, x=2 * w.x, y=2 * w.y, w=2 * w.w, h=2 * w.h) for w in words]
+    context.readings = [(parse_table([]), 1.0), (parse_table(scaled), 2.0)]
+    assert _missing_rows(reading, context) == [(270, 311)]
+
+    # A missing nutrient whose label no engine found: the whole crop.
+    context.readings = [(parse_table([]), 1.0)]
+    assert _missing_rows(reading, context) is None
+
+    # The value may be declared in the 'não contém' sentence: the whole crop.
+    context.readings = [(reading, 1.0)]
+    context.learned = sentence(320, "Não contém quantidades significativas de sódio")
+    assert _missing_rows(reading, context) is None
+
+
+def test_words_cut_by_a_strips_edge_are_fragments():
+    from vision.back.pipeline import _cut
+
+    # An 81 px strip: the label in the middle; '8' cut at the top.
+    assert not _cut(Word("Saturadas", 178, 15, 194, 51), 81)
+    assert _cut(Word("8", 932, 0, 35, 34), 81)
+    assert _cut(Word("0,5", 932, 50, 35, 31), 81)
+    assert not _cut(Word("0,5", 932, 20, 35, 31), 81)
+    # Labels stay even when as tall as the strip (slanted text).
+    assert not _cut(Word("Açúcares adicionados (g)", 0, 0, 300, 81), 81)

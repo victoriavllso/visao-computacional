@@ -9,7 +9,9 @@ ruled lines. Curved or wrinkled packages bend the lines, rows get merged,
 and the decision accuracy on dev fell from 27% to 12%.
 """
 
+import math
 import os
+import statistics
 
 import cv2
 import numpy as np
@@ -123,7 +125,9 @@ def read_row(clean, x0, y0, x1, y1, lang="por") -> list[Word]:
             output_type=pytesseract.Output.DICT,
             timeout=TIMEOUT_SECONDS,
         )
-    except RuntimeError:
+    except pytesseract.TesseractError:
+        raise  # see read_words
+    except RuntimeError:  # pytesseract's timeout
         return []
 
     return [
@@ -140,16 +144,20 @@ def read_row(clean, x0, y0, x1, y1, lang="por") -> list[Word]:
     ]
 
 
-_rapidocr = None
+# One RapidOCR engine per model size, created on first use.
+_rapidocr = {}
+_threads_limited = False
 
 
 def _limit_onnx_threads():
     """RapidOCR doesn't expose ONNX Runtime's thread count, and by default
     each process uses every core. ORT_THREADS (e.g. 1 per worker when
     evaluating in parallel) is applied to the sessions it creates."""
+    global _threads_limited
     threads = int(os.environ.get("ORT_THREADS", 0))
-    if not threads:
+    if not threads or _threads_limited:
         return
+    _threads_limited = True
 
     import onnxruntime
 
@@ -164,41 +172,122 @@ def _limit_onnx_threads():
     onnxruntime.SessionOptions = session_options
 
 
-def read_words_rapidocr(image) -> list[Word]:
-    """Learned OCR (PaddleOCR models through RapidOCR / ONNX Runtime), on the
-    color crop: it is trained on photos, binarizing first makes it worse.
-    Returns one Word per detected text line, e.g. 'Gorduras saturadas (g)'."""
-    global _rapidocr
-    if _rapidocr is None:
+# RapidOCR shrinks images to this many pixels on the long side (its
+# Global.max_side_len), then its detector enlarges them to at least
+# 736 px on the short side (Det.limit_side_len, limit_type "min").
+RAPIDOCR_MAX_SIDE = 2000
+# "<model>_native": the same models, the detector without that enlargement.
+# For strips of a few rows, already at the scale their whole crop is read
+# at: enlarged to 736 px, a 300 px strip took longer to detect than the
+# whole crop (dev, medium: 7.4 s vs 5.3 s).
+NATIVE = "_native"
+
+
+def _engine(model):
+    """PP-OCRv6 detection and recognition models: "small" (RapidOCR's
+    default) or "medium" (~4.7x slower per call on one thread, 12 dev
+    crops), each optionally NATIVE."""
+    if model not in _rapidocr:
         _limit_onnx_threads()
         import logging
 
-        from rapidocr import RapidOCR
+        from rapidocr import ModelType, RapidOCR
 
-        _rapidocr = RapidOCR()
+        size = model.removesuffix(NATIVE)
+        params = {}
+        if size == "medium":
+            params = {
+                "Det.model_type": ModelType.MEDIUM,
+                "Rec.model_type": ModelType.MEDIUM,
+            }
+        elif size != "small":
+            raise ValueError(f"unknown RapidOCR model: {model}")
+        if model.endswith(NATIVE):
+            params |= {"Det.limit_side_len": 32, "Det.limit_type": "min"}
+        engine = RapidOCR(params=params) if params else RapidOCR()
+        _rapidocr[model] = engine
 
         # Set RapidOCR's logger to ERROR level to avoid excessive logging output
-        ocr_logger = logging.getLogger("RapidOCR")
-        ocr_logger.setLevel(logging.ERROR)
+        logging.getLogger("RapidOCR").setLevel(logging.ERROR)
+    return _rapidocr[model]
 
+
+def fetch_models(model="small"):
+    """Download (and checksum) the RapidOCR models of `model` if missing.
+    RapidOCR loads each model on its first use, downloading it straight to
+    the final path, with a lock only inside one process: parallel workers
+    each download the same file and load it half-written
+    ('INVALID_PROTOBUF', server: 32 workers, medium models). Run this once,
+    before starting them. The loaders are RapidOCR's own (private; version
+    pinned in pixi.lock): an OCR call on a blank image wouldn't load the
+    recognition model, nothing being detected."""
+    engine = _engine(model)
+    for load in ("_load_det_model", "_load_cls_model", "_load_rec_model"):
+        getattr(engine, load)()
+
+
+def rapidocr_lines(image, model="small") -> list:
+    """RapidOCR's raw output as plain lists, [[box, text, score], ...], box
+    being the four corners [[x, y], ...] of the text line (it may be
+    tilted). Plain data, so it can be cached (vision/back/cache.py)."""
     if image.ndim == 2:
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-    output = _rapidocr(image)
+    output = _engine(model)(image)
     # No text found: boxes is None.
-    result = (
-        zip(output.boxes, output.txts, output.scores)
-        if output.boxes is not None
-        else []
-    )
+    if output.boxes is None:
+        return []
+    return [
+        [[[float(x), float(y)] for x, y in box], text, float(score)]
+        for box, text, score in zip(output.boxes, output.txts, output.scores)
+    ]
+
+
+# Text lines leveled before grouping rows when they tilt by more than this
+# (degrees): at 2 degrees, text drifts by more than half a row across a
+# 1000 px table. Larger tilts are text turned on its side, for orient.py.
+MIN_TILT, MAX_TILT = 1.0, 20.0
+
+
+def text_tilt(lines):
+    """Median angle (degrees, clockwise) of the long text lines, from their
+    boxes' top edges; None with fewer than 3 such lines."""
+    angles = []
+    for box, text, _ in lines:
+        (x0, y0), (x1, y1), _, (x3, y3) = box
+        width, height = math.hypot(x1 - x0, y1 - y0), math.hypot(x3 - x0, y3 - y0)
+        if len(text.strip()) >= 4 and width >= 3 * height:
+            angles.append(math.degrees(math.atan2(y1 - y0, x1 - x0)))
+    return statistics.median(angles) if len(angles) >= 3 else None
+
+
+def words_from_lines(lines, level=False) -> list[Word]:
+    """One Word per RapidOCR text line, on the line's upright bounding box.
+    `level`: on a tilted photo (the table wasn't located and straightened,
+    or the whole photo is read), turn the coordinates so the text lines are
+    horizontal, so that the words of a row share a height."""
+    tilt = text_tilt(lines) if level else None
+    if tilt is not None and MIN_TILT <= abs(tilt) <= MAX_TILT:
+        cos, sin = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
+        lines = [
+            [[[x * cos + y * sin, -x * sin + y * cos] for x, y in box], text, score]
+            for box, text, score in lines
+        ]
 
     words = []
-    for box, text, score in result or []:
+    for box, text, score in lines:
         xs, ys = [p[0] for p in box], [p[1] for p in box]
         x, y = int(min(xs)), int(min(ys))
         words.append(
             Word(text, x, y, int(max(xs)) - x, int(max(ys)) - y, 100 * float(score))
         )
     return words
+
+
+def read_words_rapidocr(image, model="small") -> list[Word]:
+    """Learned OCR (PaddleOCR models through RapidOCR / ONNX Runtime), on the
+    color crop: it is trained on photos, binarizing first makes it worse.
+    Returns one Word per detected text line, e.g. 'Gorduras saturadas (g)'."""
+    return words_from_lines(rapidocr_lines(image, model))
 
 
 def read_words(image, preprocess=True, lang="por") -> list[Word]:
@@ -213,6 +302,11 @@ def read_words(image, preprocess=True, lang="por") -> list[Word]:
             output_type=pytesseract.Output.DICT,
             timeout=TIMEOUT_SECONDS,
         )
+    except pytesseract.TesseractError:
+        # Also a RuntimeError, but a broken install (e.g. no Portuguese data
+        # where pytesseract finds tesseract), not a hard image: it would
+        # silently read nothing on every photo.
+        raise
     except RuntimeError:  # pytesseract's timeout
         return []
 
